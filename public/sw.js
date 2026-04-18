@@ -3,7 +3,7 @@
    Handles: scheduling, notification actions, grace-period fallback
    ============================================================ */
 
-const CACHE_NAME = 'medcare-sw-v1';
+const CACHE_NAME = 'medcare-sw-v2';
 
 // ── Install & Activate ────────────────────────────────────────
 self.addEventListener('install', () => self.skipWaiting());
@@ -35,7 +35,7 @@ self.addEventListener('message', (event) => {
 
   if (type === 'TEST_NOTIFICATION') {
     console.log('[MedCare SW] Received TEST_NOTIFICATION', payload);
-    fireNotification(payload.slotKey, payload.label, payload.medicines);
+    fireNotification(payload.slotKey, payload.label, payload.medicines, payload.userId, payload.journeyId);
   }
 });
 
@@ -81,7 +81,6 @@ function fireNotification(slotKey, label, medicines, userId, journeyId) {
       { action: 'taken', title: '✅ Taken' },
       { action: 'skip',  title: '❌ Not Taken' },
     ],
-    tag: slotKey,
     renotify: true,
   };
 
@@ -120,21 +119,31 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   if (autoMissed) {
-    // Just open the app
-    event.waitUntil(openApp());
+    event.waitUntil(focusOrOpenApp());
     return;
   }
 
   const action = event.action; // 'taken' | 'skip' | '' (body click)
+
+  // Body click with no action = just focus the app, no status change
+  if (!action) {
+    event.waitUntil(focusOrOpenApp());
+    return;
+  }
+
   const status = action === 'skip' ? 'not_taken' : 'taken';
 
   clearGraceTimer(slotKey);
   delete pendingSlots[slotKey];
 
-  // Broadcast to app tabs
+  // Broadcast to app tabs first, then focus (so the tab is ready to receive)
   event.waitUntil(
-    broadcastFeedback(slotKey, status, userId, journeyId, medicines)
-      .then(() => openApp())
+    focusOrOpenApp().then((client) => {
+      // Small delay so the page's SW message listener is attached
+      return new Promise(resolve => setTimeout(resolve, 300)).then(() => {
+        return broadcastFeedback(slotKey, status, userId, journeyId, medicines);
+      });
+    })
   );
 });
 
@@ -154,13 +163,26 @@ async function broadcastFeedback(slotKey, status, userId, journeyId, medicines) 
   });
 }
 
-// ── Open / focus app tab ──────────────────────────────────────
-async function openApp() {
+// ── Focus existing app tab or open new one ────────────────────
+// Fixed: no longer opens a blank page; finds ANY open medcare tab first
+async function focusOrOpenApp() {
   const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const client of allClients) {
-    if (client.url.includes('/agent')) {
-      return client.focus();
-    }
+
+  // Prefer the agent/home tab
+  const agentClient = allClients.find(c => c.url.includes('/home') || c.url.includes('/agent'));
+  if (agentClient) {
+    return agentClient.focus();
   }
-  return self.clients.openWindow('/agent');
+
+  // Any medcare tab
+  const anyClient = allClients.find(c => c.url.includes(self.location.origin));
+  if (anyClient) {
+    await anyClient.focus();
+    // Navigate it to /home
+    anyClient.postMessage({ type: 'NAVIGATE_TO', payload: { path: '/home' } });
+    return anyClient;
+  }
+
+  // No tab open — open a new one
+  return self.clients.openWindow('/home');
 }

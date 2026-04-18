@@ -44,6 +44,8 @@ env/
 *.pth
 *.pth.tar
 *.pt
+# *.pth
+# *.pt
 *.onnx
 *.h5
 *.safetensors

@@ -101,6 +101,18 @@ export default function AgentDashboard() {
     });
   }, [meds]);
 
+  // Handle SW → app navigation requests (avoids blank-page issue)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const handler = (event) => {
+      if (event.data?.type === 'NAVIGATE_TO') {
+        navigate(event.data.payload.path);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, [navigate]);
+
   const { permissionGranted, permissionDenied, markTaken, markNotTaken, resetDose, sendTestNotification } = useReminders({
     meds,
     userId,
@@ -110,6 +122,8 @@ export default function AgentDashboard() {
 
   // Fetch user + journeys + today's dose_logs
   useEffect(() => {
+    let realtimeChannel;
+
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
@@ -147,7 +161,48 @@ export default function AgentDashboard() {
         }
       }
       setLoading(false);
+
+      // ── Supabase Realtime: instantly reflect any dose_log change ──
+      // This handles: clicking taken on this tab, another tab, or a
+      // push notification action — all update the UI immediately.
+      realtimeChannel = supabase
+        .channel(`dose_logs_user_${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',           // INSERT, UPDATE, DELETE
+            schema: 'public',
+            table: 'dose_logs',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            if (payload.eventType === 'DELETE') {
+              const { medicine_name, slot, log_date } = payload.old;
+              const key = `${log_date}|${medicine_name}|${slot}`;
+              setCheckins(prev => {
+                const updated = { ...prev };
+                delete updated[key];
+                localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated));
+                return updated;
+              });
+            } else {
+              // INSERT or UPDATE
+              const { medicine_name, slot, log_date, status } = payload.new;
+              const key = `${log_date}|${medicine_name}|${slot}`;
+              setCheckins(prev => {
+                const updated = { ...prev, [key]: status };
+                localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated));
+                return updated;
+              });
+            }
+          }
+        )
+        .subscribe();
     })();
+
+    return () => {
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+    };
   }, []);
 
   // Tick every second
@@ -280,6 +335,18 @@ export default function AgentDashboard() {
   const todayTotal = allTodayKeys.length;
   const todayChecked = allTodayKeys.filter(k => checkins[k] === 'taken' || checkins[k] === true).length;
   const todayPct = todayTotal > 0 ? Math.round((todayChecked / todayTotal) * 100) : 0;
+
+  // Medicines NOT yet taken today (used for test notification)
+  const untakenMeds = [
+    ...morningMeds.filter(m => { const k = `${todayStr}|${m.name}|morning`; return checkins[k] !== 'taken' && checkins[k] !== true; }),
+    ...afternoonMeds.filter(m => { const k = `${todayStr}|${m.name}|afternoon`; return checkins[k] !== 'taken' && checkins[k] !== true; }),
+    ...eveningMeds.filter(m => { const k = `${todayStr}|${m.name}|evening`; return checkins[k] !== 'taken' && checkins[k] !== true; }),
+  ];
+
+  // Wrapped test notification that targets only untaken medicines
+  const handleTestNotification = useCallback(() => {
+    sendTestNotification(untakenMeds.length > 0 ? untakenMeds : meds);
+  }, [sendTestNotification, untakenMeds, meds]);
 
   // Weekly bar data (last 5 days)
   const weeklyData = Array.from({ length: 5 }, (_, i) => {
@@ -423,8 +490,8 @@ export default function AgentDashboard() {
                         const isNotTaken = status === 'not_taken';
                         return (
                           <label key={idx} onClick={() => toggleCheckin(med.name, slot)} className="flex items-center gap-3 cursor-pointer group p-2.5 rounded-xl hover:bg-gray-50 transition-colors">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                              isTaken ? 'bg-emerald-500 border-emerald-500' :
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+                              isTaken ? 'bg-emerald-500 border-emerald-500 scale-110 animate-pop' :
                               isNotTaken ? 'bg-rose-400 border-rose-400' :
                               'border-gray-300 group-hover:border-sky-400'
                             }`}>
@@ -469,20 +536,20 @@ export default function AgentDashboard() {
                         </span>
                         <p className="text-[9px] text-gray-400 max-w-[160px] text-center leading-relaxed">Click the 🔒 lock icon in the address bar → Site settings → Notifications → Allow</p>
                         <button
-                          onClick={sendTestNotification}
+                          onClick={handleTestNotification}
                           className="text-[10px] font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-full transition-colors"
                         >🔄 Try Again</button>
                       </div>
                     ) : (
                       <button
-                        onClick={sendTestNotification}
+                        onClick={handleTestNotification}
                         className="text-[11px] font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-full transition-colors"
                       >
                         🔔 Enable Reminders
                       </button>
                     )}
                     <button
-                      onClick={sendTestNotification}
+                      onClick={handleTestNotification}
                       className="text-[10px] text-gray-400 hover:text-gray-600 underline underline-offset-2"
                     >Test notification</button>
                   </div>
@@ -569,6 +636,17 @@ export default function AgentDashboard() {
           )}
         </div>
       </main>
+
+      {/* Styles */}
+      <style>{`
+        @keyframes pop {
+          0%   { transform: scale(1); }
+          40%  { transform: scale(1.4); }
+          70%  { transform: scale(0.92); }
+          100% { transform: scale(1); }
+        }
+        .animate-pop { animation: pop 0.35s cubic-bezier(.36,.07,.19,.97) both; }
+      `}</style>
 
       {/* Hidden Printable Report Section */}
       <style dangerouslySetInnerHTML={{ __html: `

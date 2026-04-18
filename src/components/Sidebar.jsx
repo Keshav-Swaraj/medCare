@@ -31,14 +31,14 @@ export default function Sidebar({ activeTab }) {
 
   return (
     <aside className="no-print w-64 bg-white border-r border-gray-100 flex flex-col shrink-0">
-      <div className="p-6 flex items-center gap-2">
-        <div className="grid grid-cols-2 gap-[3px] p-1.5 rounded-lg border border-gray-100">
-          <div className="w-2 h-2 rounded-full bg-amber-500" />
-          <div className="w-2 h-2 rounded-full bg-sky-400" />
-          <div className="w-2 h-2 rounded-full bg-sky-400" />
-          <div className="w-2 h-2 rounded-full bg-sky-400" />
+      <div className="p-6 flex items-center gap-2 group cursor-pointer" onClick={() => navigate('/')}>
+        <div className="grid grid-cols-2 gap-[3px] p-1.5 rounded-lg border border-gray-100 transition-transform duration-500 group-hover:rotate-180">
+          <div className="w-2 h-2 rounded-full bg-brandBlue transition-transform duration-300 group-hover:scale-110" />
+          <div className="w-2 h-2 rounded-full bg-gray-800 transition-transform duration-300 group-hover:scale-110" />
+          <div className="w-2 h-2 rounded-full bg-gray-800 transition-transform duration-300 group-hover:scale-110" />
+          <div className="w-2 h-2 rounded-full bg-gray-800 transition-transform duration-300 group-hover:scale-110" />
         </div>
-        <span className="font-semibold text-lg text-gray-900 tracking-tight">MedCare</span>
+        <span className="font-semibold text-lg text-gray-900 tracking-tight group-hover:text-brandBlue transition-colors duration-300">MedCare</span>
       </div>
 
       <div className="px-4 pb-2">
