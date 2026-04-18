@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Inbox, Bell, Search, ChevronRight, Sun, Sunset, Moon, Upload, LogOut, FileText, Pill, ScanLine, UserSearch } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useReminders, loadRecentLogs } from '../hooks/useReminders';
+import Sidebar from '../components/Sidebar';
 
 const CHECKIN_KEY = 'medcare_checkins';
 const COLORS = ['sky', 'emerald', 'amber', 'violet', 'rose', 'indigo'];
@@ -192,10 +193,6 @@ export default function AgentDashboard() {
 
 
   // Derived
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
-  };
 
   const todayStr = now.toISOString().split('T')[0];
   const firstJourney = journeys[0];
@@ -262,54 +259,7 @@ export default function AgentDashboard() {
     <div className="flex h-screen bg-[#f8fafc] font-sans overflow-hidden">
 
       {/* Sidebar */}
-      <aside className="no-print w-64 bg-white border-r border-gray-100 flex flex-col shrink-0">
-        <div className="p-6 flex items-center gap-2">
-          <div className="grid grid-cols-2 gap-[3px] p-1.5 rounded-lg border border-gray-100">
-            <div className="w-2 h-2 rounded-full bg-amber-500" />
-            <div className="w-2 h-2 rounded-full bg-sky-400" />
-            <div className="w-2 h-2 rounded-full bg-sky-400" />
-            <div className="w-2 h-2 rounded-full bg-sky-400" />
-          </div>
-          <span className="font-semibold text-lg text-gray-900 tracking-tight">MedCare</span>
-        </div>
-
-        <div className="px-4 pb-2">
-          <button onClick={() => navigate('/upload')}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
-            <span className="w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center text-xs">+</span>
-            Upload New
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">General</p>
-            <nav className="space-y-1">
-              <button className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-100 rounded-xl text-gray-900 font-medium text-sm">
-                <div className="flex items-center gap-3"><LayoutDashboard className="w-4 h-4 text-sky-500" /> Home</div>
-              </button>
-              <button onClick={() => navigate('/chatbot')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
-                <div className="flex items-center gap-3"><Inbox className="w-4 h-4" /> Agent Chat</div>
-              </button>
-              <button onClick={() => navigate('/my-medicines')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
-                <div className="flex items-center gap-3"><Pill className="w-4 h-4" /> My Medicine</div>
-              </button>
-              <button onClick={() => navigate('/diagnostics')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
-                <div className="flex items-center gap-3"><ScanLine className="w-4 h-4" /> Diagnostics</div>
-              </button>
-              <button onClick={() => navigate('/search-doctor')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
-                <div className="flex items-center gap-3"><UserSearch className="w-4 h-4" /> Find Doctor</div>
-              </button>
-            </nav>
-          </div>
-
-          <div className="pt-4 mt-4 border-t border-gray-100">
-            <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500 hover:bg-rose-50 rounded-xl font-medium text-sm transition-colors">
-              <LogOut className="w-4 h-4" /> Log Out
-            </button>
-          </div>
-        </div>
-      </aside>
+      <Sidebar activeTab="home" />
 
       {/* Main */}
       <main className="no-print flex-1 flex flex-col min-w-0 overflow-y-auto">

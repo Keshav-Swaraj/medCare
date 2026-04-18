@@ -160,7 +160,6 @@ def search_medicine(q: str = Query(..., description="Medicine name to search")):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 class ChatMessage(BaseModel):
     role: str   # "user" or "assistant"
     content: str

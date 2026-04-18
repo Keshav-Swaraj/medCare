@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Inbox, Send, User, Bot, Bell, Search, ChevronRight, Loader2, Pill } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import Sidebar from '../components/Sidebar';
 
 const OCR_API = import.meta.env.VITE_OCR_API_URL || 'http://localhost:8000';
 
@@ -122,42 +123,7 @@ export default function Chatbot() {
     <div className="flex h-screen bg-[#f8fafc] font-sans overflow-hidden">
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shrink-0">
-        <div className="p-6 flex items-center gap-2">
-          <div className="grid grid-cols-2 gap-[3px] p-1.5 rounded-lg border border-gray-100">
-            <div className="w-2 h-2 rounded-full bg-amber-500" />
-            <div className="w-2 h-2 rounded-full bg-blue-400" />
-            <div className="w-2 h-2 rounded-full bg-blue-400" />
-            <div className="w-2 h-2 rounded-full bg-blue-400" />
-          </div>
-          <span className="font-semibold text-lg text-gray-900 tracking-tight">MedCare</span>
-        </div>
-
-        <div className="px-4 pb-2">
-          <button onClick={() => navigate('/upload')}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
-            <span className="w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center text-xs">+</span>
-            Upload New
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">General</p>
-            <nav className="space-y-1">
-              <button onClick={() => navigate('/home')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
-                <div className="flex items-center gap-3"><LayoutDashboard className="w-4 h-4" /> Home</div>
-              </button>
-              <button className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-100 rounded-xl text-gray-900 font-medium text-sm">
-                <div className="flex items-center gap-3"><Inbox className="w-4 h-4 text-blue-600" /> Agent Chat</div>
-              </button>
-              <button onClick={() => navigate('/my-medicines')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
-                <div className="flex items-center gap-3"><Pill className="w-4 h-4" /> My Medicine</div>
-              </button>
-            </nav>
-          </div>
-        </div>
-      </aside>
+      <Sidebar activeTab="chat" />
 
       {/* Main Chat */}
       <main className="flex-1 flex flex-col min-w-0">

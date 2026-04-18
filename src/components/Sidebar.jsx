@@ -1,0 +1,78 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Inbox, Pill, ScanLine, UserSearch, LogOut } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+
+export default function Sidebar({ activeTab }) {
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
+  const NavItem = ({ id, label, icon: Icon, path }) => {
+    const isActive = activeTab === id;
+    
+    if (isActive) {
+      return (
+        <button className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-100 rounded-xl text-gray-900 font-medium text-sm">
+          <div className="flex items-center gap-3"><Icon className="w-4 h-4 text-sky-500" /> {label}</div>
+        </button>
+      );
+    }
+
+    return (
+      <button onClick={() => navigate(path)} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
+        <div className="flex items-center gap-3"><Icon className="w-4 h-4" /> {label}</div>
+      </button>
+    );
+  };
+
+  return (
+    <aside className="no-print w-64 bg-white border-r border-gray-100 flex flex-col shrink-0">
+      <div className="p-6 flex items-center gap-2">
+        <div className="grid grid-cols-2 gap-[3px] p-1.5 rounded-lg border border-gray-100">
+          <div className="w-2 h-2 rounded-full bg-amber-500" />
+          <div className="w-2 h-2 rounded-full bg-sky-400" />
+          <div className="w-2 h-2 rounded-full bg-sky-400" />
+          <div className="w-2 h-2 rounded-full bg-sky-400" />
+        </div>
+        <span className="font-semibold text-lg text-gray-900 tracking-tight">MedCare</span>
+      </div>
+
+      <div className="px-4 pb-2">
+        <button onClick={() => navigate('/upload')}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+          <span className="w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center text-xs">+</span>
+          Upload New
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">MedCare</p>
+          <nav className="space-y-1">
+            <NavItem id="home" label="Home" icon={LayoutDashboard} path="/home" />
+            <NavItem id="chat" label="Agent Chat" icon={Inbox} path="/chatbot" />
+            <NavItem id="medicine" label="My Medicine" icon={Pill} path="/my-medicines" />
+          </nav>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">MedVision</p>
+          <nav className="space-y-1">
+            <NavItem id="diagnostics" label="Diagnostics" icon={ScanLine} path="/diagnostics" />
+            <NavItem id="find-doctor" label="Find Doctor" icon={UserSearch} path="/search-doctor" />
+          </nav>
+        </div>
+
+        <div className="pt-4 mt-4 border-t border-gray-100">
+          <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500 hover:bg-rose-50 rounded-xl font-medium text-sm transition-colors">
+            <LogOut className="w-4 h-4" /> Log Out
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}

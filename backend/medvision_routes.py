@@ -1038,21 +1038,40 @@ async def search_doctors(
         search_lat, search_lng = location_obj.latitude, location_obj.longitude
         print(f"Geocoded {location} to ({search_lat}, {search_lng})")
 
-    overpass_url = "http://overpass-api.de/api/interpreter"
+    radius = 15000  # 15 km
     query = f"""
     [out:json][timeout:30];
     (
-      node["healthcare"="doctor"](around:100000,{search_lat},{search_lng});
-      node["amenity"="doctors"](around:100000,{search_lat},{search_lng});
+      node["healthcare"="doctor"](around:{radius},{search_lat},{search_lng});
+      node["amenity"="doctors"](around:{radius},{search_lat},{search_lng});
+      node["amenity"="clinic"](around:{radius},{search_lat},{search_lng});
+      node["amenity"="hospital"](around:{radius},{search_lat},{search_lng});
+      node["healthcare"="clinic"](around:{radius},{search_lat},{search_lng});
     );
     out body;
     """
+
+    overpass_mirrors = [
+        "https://z.overpass-api.de/api/interpreter",
+        "https://overpass-api.de/api/interpreter",
+        "https://lz4.overpass-api.de/api/interpreter",
+    ]
+    elements = []
     try:
         async with httpx.AsyncClient(timeout=45.0) as client:
-            res = await client.post(overpass_url, data=query)
-            data = res.json()
-            elements = data.get("elements", [])
-            print(f"Overpass query returned {len(elements)} elements for {location}")
+            for mirror_url in overpass_mirrors:
+                try:
+                    res = await client.post(mirror_url, data={"data": query})
+                    if res.status_code == 200:
+                        data = res.json()
+                        elements = data.get("elements", [])
+                        print(f"Overpass ({mirror_url.split('//')[1].split('/')[0]}) returned {len(elements)} elements for {location}")
+                        break
+                    else:
+                        print(f"Overpass mirror {mirror_url} returned {res.status_code}, trying next...")
+                except Exception as mirror_err:
+                    print(f"Overpass mirror {mirror_url} failed: {mirror_err}, trying next...")
+                    continue
     except Exception as e:
         print(f"Overpass query failed: {e}")
         elements = []
@@ -1066,6 +1085,7 @@ async def search_doctors(
             continue
         doctors.append(doctor)
 
+    doctors = _sort_doctors_by_distance(doctors, search_lat, search_lng)
     print(f"Returning {len(doctors)} doctors for {location} (specialty: {specialty})")
     return doctors
 # @router.get("/api/get-doctor/{doctor_id}", response_model=Doctor)
@@ -1188,7 +1208,7 @@ def _find_best_known_condition(term: str, report_terms: List[str]) -> Optional[s
 
 
 def _build_report_chat_reply(user_message: str, report_context: Optional[Dict[str, Any]], chat_history: Optional[List[Dict[str, str]]] = None) -> str:
-    msg = user_message.strip().lower()
+    msg = user_message.strip()
     if not msg:
         return "Please ask your question about the report."
 
@@ -1201,137 +1221,62 @@ def _build_report_chat_reply(user_message: str, report_context: Optional[Dict[st
     suggested_tests = _safe_list(ctx.get("suggested_tests"))
     specialty = str(ctx.get("specialty") or "General Physician")
     report_text = str(ctx.get("report") or "")
-    report_terms = [diagnosis] + symptoms
 
-    has_context = bool(ctx)
-    if not has_context:
+    if not ctx:
         return (
             "I can answer report-specific doubts, but I do not have your latest report context. "
             "Please open chat from the result page after upload."
         )
 
-    if any(k in msg for k in ["hello", "hi", "hey", "good morning", "good evening"]):
-        return (
-            f"Hello. I reviewed your report context: diagnosis is {diagnosis} with confidence {confidence_text}. "
-            "You can ask about meaning, seriousness, recovery, treatment options, tests, or specialist follow-up."
+    system_prompt = f"""You are MedVision AI Assistant, a professional radiology and diagnostic specialist.
+Your goal is to explain medical diagnostic reports to patients in a clear, compassionate, and accurate manner.
+
+CURRENT REPORT CONTEXT:
+- Diagnosis/Condition: {diagnosis}
+- AI Confidence: {confidence_text}
+- Findings/Symptoms: {", ".join(symptoms) if symptoms else "Not specified"}
+- Recommendations: {"; ".join(recommendations) if recommendations else "Consult a specialist"}
+- Suggested Tests: {", ".join(suggested_tests) if suggested_tests else "Not specified"}
+- Suggested Specialist: {specialty}
+
+FULL REPORT TEXT:
+{report_text}
+
+GUIDELINES:
+1. Use the provided context to answer questions specifically about this report.
+2. Explain medical terms in simple, easy-to-understand language.
+3. If asked to "summarize" or "explain the report", provide a concise overview of the diagnosis, confidence, and next steps.
+4. If a question is unrelated to the report or general medical knowledge, politely redirect to the report context.
+5. ALWAYS maintain a professional tone and include a disclaimer that you are an AI and the patient should consult a doctor for final confirmation.
+6. Do not mention "confidence scores" unless specifically asked or explaining the reliability of the AI finding.
+7. Be encouraging but realistic.
+"""
+
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # Add history
+    if chat_history:
+        for m in chat_history:
+            role = "user" if m.get("role") == "user" else "assistant"
+            content = m.get("text") or m.get("content") or ""
+            if content:
+                messages.append({"role": role, "content": content})
+    
+    # Add current message
+    messages.append({"role": "user", "content": msg})
+
+    try:
+        model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=800,
         )
-
-    if any(k in msg for k in ["diagnosis", "disease", "what do i have", "condition"]):
-        return f"Your report indicates: {diagnosis}. Confidence: {confidence_text}."
-
-    explained_term = _extract_condition_query(user_message)
-    if explained_term:
-        matched = _find_best_known_condition(explained_term, report_terms)
-        if matched and matched in _CONDITION_EXPLANATIONS:
-            return (
-                f"{_CONDITION_EXPLANATIONS[matched]} "
-                "This is based on your report context, but final diagnosis must be confirmed by a doctor."
-            )
-
-        if diagnosis and explained_term in _normalize_term(diagnosis):
-            return (
-                f"{diagnosis} means an abnormal finding that needs clinical correlation. "
-                "Your report confidence is " + confidence_text + ". Please review with a specialist for confirmation."
-            )
-
-        return (
-            f"I could not confidently identify '{explained_term}', but I can still help with medical doubts in simple language. "
-            "Ask like: what does this diagnosis mean, how serious is it, treatment options, recovery, tests, or when to seek emergency care."
-        )
-
-    if any(k in msg for k in ["confidence", "%", "how sure", "accurate"]):
-        return f"The model confidence in your report is {confidence_text} for {diagnosis}."
-
-    if any(k in msg for k in ["recover", "recovery", "get better", "heal", "cure"]):
-        rec_text = "; ".join(recommendations) if recommendations else "consult your specialist and follow a personalized treatment plan"
-        return (
-            f"Recovery depends on the exact cause of {diagnosis} and your clinical condition. "
-            f"Based on your report, start with: {rec_text}. "
-            "Most patients improve with early diagnosis and proper follow-up. Please discuss a definitive plan with your doctor."
-        )
-
-    if any(k in msg for k in ["treatment", "medicine", "medication", "how to treat", "how to cure"]):
-        return (
-            f"Treatment for {diagnosis} depends on confirmation tests and clinical evaluation. "
-            "It may include observation/follow-up scans, medicines for infection or inflammation, "
-            "and in selected cases procedures like biopsy. Do not self-medicate; consult your specialist."
-        )
-
-    if any(k in msg for k in ["prognosis", "will i be okay", "can i be fine", "will it go away", "outlook"]):
-        return (
-            f"The outlook for {diagnosis} varies by underlying cause, size/progression on follow-up imaging, and symptoms. "
-            "With timely specialist review and recommended tests, many cases can be managed effectively."
-        )
-
-    if any(k in msg for k in ["serious", "dangerous", "is it bad", "should i worry"]):
-        return (
-            f"Based on your report, the main finding is {diagnosis} with confidence {confidence_text}. "
-            "It may or may not be serious; severity cannot be confirmed from AI output alone. "
-            f"Please consult a {specialty} promptly for clinical confirmation."
-        )
-
-    if any(k in msg for k in ["cancer", "is it cancer", "malignant", "benign"]):
-        return (
-            "This report alone cannot confirm cancer vs benign disease. "
-            "That usually needs specialist review and sometimes follow-up imaging or biopsy."
-        )
-
-    if any(k in msg for k in ["emergency", "urgent", "hospital now", "when to go hospital", "danger signs"]):
-        return (
-            "Go to emergency care immediately if there is severe breathlessness, chest pain, confusion, "
-            "low oxygen, high persistent fever, repeated vomiting, seizures, or sudden neurological weakness."
-        )
-
-    if any(k in msg for k in ["diet", "food", "lifestyle", "exercise", "home care"]):
-        return (
-            "General advice: hydrate well, avoid smoking/alcohol, sleep adequately, and follow doctor guidance. "
-            "Disease-specific treatment should come from your specialist after confirmation."
-        )
-
-    if any(k in msg for k in ["why", "cause", "how did this happen"]):
-        return (
-            f"Possible causes depend on the finding ({diagnosis}) and your history. "
-            "Common causes can include infection, inflammation, benign growth, or less commonly malignancy. "
-            "A doctor will correlate with symptoms, exam, and follow-up tests."
-        )
-
-    if any(k in msg for k in ["symptom", "finding", "detected"]):
-        if symptoms:
-            return "Symptoms/findings noted in your report: " + ", ".join(symptoms) + "."
-        return "No explicit symptoms were listed in your report context."
-
-    if any(k in msg for k in ["test", "scan", "next test", "suggested test"]):
-        if suggested_tests:
-            return "Suggested tests from your report: " + ", ".join(suggested_tests) + "."
-        return "No specific tests were listed. A clinician may advise follow-up imaging or labs based on your history."
-
-    if any(k in msg for k in ["doctor", "specialist", "whom should i consult", "who to consult"]):
-        return f"Based on the report, the suggested specialist is: {specialty}."
-
-    if any(k in msg for k in ["what should i do", "next step", "next steps", "treatment", "advice", "recommend"]):
-        if recommendations:
-            return "Recommended next steps: " + "; ".join(recommendations) + "."
-        return "Please consult a specialist and carry this report for clinical correlation and confirmation."
-
-    if any(k in msg for k in ["summary", "summarize", "explain report", "overall"]):
-        summary = f"Summary: Diagnosis is {diagnosis} with confidence {confidence_text}."
-        if symptoms:
-            summary += " Key findings: " + ", ".join(symptoms) + "."
-        if recommendations:
-            summary += " Next steps: " + "; ".join(recommendations) + "."
-        summary += " This is AI-assisted and should be confirmed by a doctor."
-        return summary
-
-    if report_text:
-        return (
-            f"From your report: diagnosis is {diagnosis} with confidence {confidence_text}. "
-            "I can also help with: meaning of diagnosis, seriousness, recovery, treatment, prognosis, tests, specialist, and next steps."
-        )
-
-    return (
-        "I can help with diagnosis meaning, confidence, symptoms, tests, specialist, recovery, treatment, prognosis, and emergency signs. "
-        "Ask in your own words and I will explain."
-    )
+        return (response.choices[0].message.content or "").strip()
+    except Exception as exc:
+        print(f"CHAT_WITH_REPORT ERROR: {exc}")
+        return "I'm sorry, I'm having trouble connecting to my knowledge base right now. Please try again in a moment."
 
 @router.post("/chat_with_report/")
 async def chat_with_report(request: ChatRequest):
