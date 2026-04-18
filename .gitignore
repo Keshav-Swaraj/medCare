@@ -32,7 +32,7 @@ __pycache__/
 *.py[cod]
 
 # Deep Learning Models
-*.pth
-*.pt
+# *.pth
+# *.pt
 *.onnx
 *.h5
