@@ -1,190 +1,140 @@
-# 💊 MedCare Agent
+# 💊 MedCare — Your Autonomous Health Companion
 
-> **Turn any prescription into a 30-day personal health journey.**
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Click_Here-blue?style=for-the-badge&logo=vercel)](https://med-care-tau.vercel.app/)
 
-MedCare is an autonomous prescription journey companion built for elderly patients and caregivers in India. Upload a handwritten prescription or discharge summary, let AI extract your medicines, compare prices, and activate a 30-day adherence agent with daily reminders.
 
----
-
-## ✨ Features
-
-| Feature | Description |
-|---|---|
-| 📸 **Prescription OCR** | Upload any handwritten or printed prescription image — Gemini AI extracts medicine name, frequency, and duration |
-| 💰 **Price Comparison** | Real-time PharmEasy search with MRP vs. sale price and direct buy links |
-| 📅 **30-Day Journey** | Activate the MedCare Agent to start a persistent adherence tracking journey |
-| 🔔 **Smart Reminders** | Browser push notifications at 8 AM / 1 PM / 8 PM with ✅ Taken / ❌ Not Taken actions |
-| 📊 **Live Dashboard** | Today's schedule, weekly adherence bar chart, radial overview, and per-medicine course progress |
-| 🤖 **AI Chatbot** | Context-aware medical assistant pre-loaded with your prescription and adherence history |
-| 🌐 **Hindi Support** | Designed for elderly users and caregivers in India |
+**Doctor’s visit over. Now what?**  
+MedCare transforms confusing prescriptions, complex medical scans, and dense reports into simple, actionable guidance. Designed for families and caregivers, it bridges the gap between the clinic and daily recovery with AI-driven adherence, smart reminders, and plain-language medical insights.
 
 ---
 
-## 🗂️ Project Structure
+### 🎯 The Problem
+In the rush of a clinical visit, patients often leave with:
+- **Illegible Handouts**: Messy handwritten prescriptions that are hard to decipher.
+- **Complex Scans**: MRI/CT/X-ray reports filled with intimidating medical jargon.
+- **Adherence Gaps**: Confusion over dosage timings, food precautions, and missed doses.
+- **High Costs**: Lack of visibility into cheaper, high-quality medicine alternatives.
 
-```
-medCare/
-├── public/
-│   └── sw.js                  # Service Worker — dose-time push notifications
-├── src/
-│   ├── components/
-│   │   ├── FloatingElements.jsx
-│   │   ├── Hero.jsx
-│   │   ├── Navbar.jsx
-│   │   └── ProtectedRoute.jsx
-│   ├── hooks/
-│   │   └── useReminders.js    # Reminder scheduling + Supabase dose_logs sync
-│   ├── lib/
-│   │   └── supabase.js        # Supabase client
-│   └── pages/
-│       ├── AgentDashboard.jsx # Main user home (schedule, countdown, adherence)
-│       ├── Chatbot.jsx        # AI medical assistant
-│       ├── Landing.jsx        # Public landing page
-│       ├── Login.jsx          # Auth — sign in
-│       ├── Signup.jsx         # Auth — sign up
-│       └── Upload.jsx         # Prescription upload + results + activation
-├── backend/
-│   ├── main.py                # FastAPI — OCR, price search, AI chat endpoints
-│   ├── ocr_service.py         # Gemini 2.5 Flash OCR pipeline
-│   └── requirements.txt
-├── design.md                  # MedCare design system & component guidelines
-├── reference.md               # Project reference for AI agents
-└── .env                       # Environment variables (never commit)
-```
+MedCare solves the **"post-visit black hole"** by becoming your personal autonomous health companion.
 
 ---
 
-## 🚀 Getting Started
+### ✨ Key Features
 
-### Prerequisites
+#### 📄 Smart Prescription OCR
+- **Gemini 2.0 Flash Power**: Upload any handwritten prescription. Our pipeline extracts medicine names, dosages, frequencies, and durations with high precision.
+- **Price Transparency**: Instant price comparison across **1mg, PharmEasy, Apollo, and Truemeds** to find the most affordable options.
 
-- Node.js 18+
-- Python 3.10+
-- A [Supabase](https://supabase.com) project
-- A Google Gemini API key
-- A Groq API key (for the chatbot)
+#### 🧠 MedVision: Diagnostic Intelligence
+- **Multi-Modal Analysis**: Specialized Deep Learning models (DenseNet121, ResNet50) analyze **X-rays, MRI, CT, and Ultrasound** scans.
+- **Plain-Language Reports**: Converts complex findings into concise, 200-300 word summaries that anyone can understand.
+- **Lab Report Insight**: AI-driven analysis of blood tests and pathology reports.
 
-### 1. Clone & Install Frontend
+#### ⏰ Intelligent Adherence Agent
+- **30-Day Journey**: One-click setup for your entire medication course.
+- **Smart Reminders**: Web Push notifications ensuring you never miss a dose.
+- **Visual Progress**: Dynamic **Recharts** dashboard showing ✅ Taken vs ❌ Missed adherence rates.
 
-```bash
-git clone https://github.com/your-username/medCare.git
-cd medCare
-npm install
-```
+#### 💬 Context-Aware AI Companion
+- **LLaMA 3.3 70B Powered**: An AI agent that remembers your medication history, allergies, and conditions.
+- **Actionable Advice**: Ask "How does this medicine affect my diet?" or "What are the side effects?" and get personalized, compassionate answers.
 
-### 2. Install Backend
-
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-### 3. Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_OCR_API_URL=http://localhost:8000
-```
-
-Create a `.env` file inside `backend/`:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key
-GROQ_API_KEY=your_groq_api_key
-```
-
-### 4. Supabase Database Setup
-
-Run the following SQL in your **Supabase SQL Editor**:
-
-```sql
--- Journeys table
-CREATE TABLE journeys (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id),
-  status TEXT CHECK (status IN ('draft', 'active')) DEFAULT 'draft',
-  source TEXT CHECK (source IN ('image', 'manual')),
-  raw_image_url TEXT,
-  extracted_data JSONB,
-  price_comparison JSONB,
-  adherence JSONB,
-  whatsapp_reminders JSONB,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
--- Dose logs table (for reminder feedback)
-CREATE TABLE dose_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  journey_id UUID REFERENCES journeys(id) ON DELETE CASCADE,
-  medicine_name TEXT NOT NULL,
-  slot TEXT CHECK (slot IN ('morning', 'afternoon', 'evening')) NOT NULL,
-  log_date DATE NOT NULL,
-  status TEXT CHECK (status IN ('taken', 'not_taken', 'pending')) DEFAULT 'pending',
-  notified_at TIMESTAMP WITH TIME ZONE,
-  responded_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  UNIQUE(user_id, medicine_name, slot, log_date)
-);
-
-ALTER TABLE journeys ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users manage own journeys" ON journeys FOR ALL USING (auth.uid() = user_id);
-
-ALTER TABLE dose_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users manage own logs" ON dose_logs FOR ALL USING (auth.uid() = user_id);
-```
-
-### 5. Run the App
-
-**Terminal 1 — Backend:**
-```bash
-cd backend
-uvicorn main:app --reload
-# Runs on http://localhost:8000
-```
-
-**Terminal 2 — Frontend:**
-```bash
-cd medCare
-npm run dev
-# Runs on http://localhost:5173
-```
+#### 📍 Healthcare Connectivity
+- **Doctor Finder**: Integrated **Leaflet.js + Overpass API** to locate specialized doctors and hospitals near your live location.
 
 ---
 
-## 🔔 Reminder System
+### 📸 Visual Tour
 
-The reminder system uses the **free Web Push Notifications API** — no third-party service or cost required.
-
-1. Open the dashboard → click **"🔔 Enable Reminders"** → grant browser permission.
-2. A green **"Reminders Active"** badge appears next to the Next Dose timer.
-3. At **8:00 AM**, **1:00 PM**, and **8:00 PM** a native browser notification fires with your medicine list.
-4. Tap **✅ Taken** → green checkmark on the schedule card, stored in Supabase.
-5. Tap **❌ Not Taken** or dismiss → after 10 minutes a **"Missed Dose Alert"** fires and the card shows a red **"Missed"** badge.
-6. Works even when the browser tab is in the background.
+<p align="center">
+  <img src="public/screenshots/landing.png" width="45%" alt="Landing Page" />
+  <img src="public/screenshots/dashboard.png" width="45%" alt="Dashboard" />
+</p>
+<p align="center">
+  <img src="public/screenshots/ocr.png" width="45%" alt="Prescription OCR" />
+  <img src="public/screenshots/medvision.png" width="45%" alt="MedVision" />
+</p>
 
 ---
 
-## 🛠️ Tech Stack
+### 🛠️ Tech Stack
 
 | Layer | Technology |
-|---|---|
-| Frontend | React 18 + Vite + Tailwind CSS |
-| Backend | Python + FastAPI |
-| Database | Supabase (PostgreSQL) |
-| Auth | Supabase Auth |
-| OCR / AI | Google Gemini 2.5 Flash |
-| Chatbot LLM | Groq (LLaMA 3.3 70B) |
-| Price Data | PharmEasy API |
-| Reminders | Web Push / Service Worker (free) |
-| Charts | Recharts |
+| :--- | :--- |
+| **Frontend** | React 19, Vite, Tailwind CSS 4, Framer Motion |
+| **Data Viz** | Recharts, Lucide Icons |
+| **Backend** | Python 3.10+, FastAPI, Uvicorn |
+| **AI Models** | Google Gemini 2.0 Flash, Groq (LLaMA 3.3 70B), Llama 4 Scout |
+| **Deep Learning** | PyTorch, Monai, TensorFlow, Keras |
+| **Database/Auth** | Supabase (PostgreSQL + Row Level Security) |
+| **Maps** | Leaflet.js, Overpass API |
+| **Notifications** | Service Workers, Web Push API |
 
 ---
 
-## 📄 License
+### 📊 Architecture Overview
 
-MIT — built for HackSurgeX Open Innovation Track.
+```mermaid
+graph TD
+    A[User/Caregiver] -->|Upload Prescription/Scan| B(Vite Frontend)
+    B -->|FastAPI Requests| C{MedCare API}
+    C -->|OCR Request| D[Gemini 2.0 Flash]
+    C -->|Imaging Analysis| E[Deep Learning Models]
+    C -->|Chat Request| F[Groq LLaMA 3.3 70B]
+    C -->|Sync Data| G[(Supabase DB)]
+    G -->|Push Notification| H[Web Push Service]
+    H -->|Reminder| A
+```
+
+---
+
+### 🚀 Quick Start
+
+#### 1. Clone the Repository
+```bash
+git clone https://github.com/Keshav-Swaraj/medCare.git
+cd medCare
+```
+
+#### 2. Backend Setup
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+# Add your GEMINI_API_KEY, GROQ_API_KEY
+uvicorn main:app --reload --port 8000
+```
+
+#### 3. Frontend Setup
+```bash
+# In a new terminal
+cd ..
+npm install
+cp .env.example .env
+# Add your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+npm run dev
+```
+
+---
+
+### ⚠️ Important Disclaimer
+**Not a medical device.** MedCare is a prototype developed for educational and demonstration purposes.  
+- All AI outputs (OCR, Imaging, Chat) are preliminary and **not** a substitute for professional medical advice.
+- Always consult a certified healthcare professional before making any medical decisions.
+- Do not rely solely on this tool for emergency or critical health management.
+
+---
+
+### 🙌 Why We Built This
+In many households, especially in India, the transition from the doctor's clinic to home recovery is often chaotic. Caregivers are overwhelmed, and elderly patients struggle with complex schedules. MedCare was built to provide a **bridge of clarity**—leveraging state-of-the-art AI to ensure that "Post-Visit" doesn't mean "Confusion".
+
+### 👥 Team
+- **Keshav Swaraj** — Full Stack & AI Implementation
+- *[Add other team members here]*
+
+---
+
+### 📄 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
