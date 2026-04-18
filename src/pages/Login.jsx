@@ -24,7 +24,7 @@ function Login() {
       setError(error.message);
       setLoading(false);
     } else {
-      navigate('/upload');
+      navigate('/home');
     }
   };
 
@@ -63,7 +63,7 @@ function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brandBlue/20 focus:border-brandBlue transition-all text-gray-900"
+                className="w-full pl-10 pr-4 py-3 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all text-gray-900"
                 placeholder="Enter your email"
               />
             </div>
@@ -80,7 +80,7 @@ function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brandBlue/20 focus:border-brandBlue transition-all text-gray-900"
+                className="w-full pl-10 pr-4 py-3 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all text-gray-900"
                 placeholder="••••••••"
               />
             </div>
@@ -89,14 +89,14 @@ function Login() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-brandBlue hover:bg-blue-600 text-white font-medium py-3 rounded-xl shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-95 flex justify-center items-center mt-2 disabled:opacity-70 disabled:hover:scale-100"
+            className="w-full bg-sky-500 hover:bg-sky-600 text-white font-medium py-3 rounded-xl shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-95 flex justify-center items-center mt-2 disabled:opacity-70 disabled:hover:scale-100"
           >
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-8 font-medium">
-          Don't have an account? <Link to="/signup" className="text-brandBlue hover:text-blue-700 font-semibold transition-colors">Sign up</Link>
+          Don't have an account? <Link to="/signup" className="text-sky-500 hover:text-blue-700 font-semibold transition-colors">Sign up</Link>
         </p>
       </div>
     </div>

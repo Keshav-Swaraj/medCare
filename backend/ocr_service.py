@@ -67,7 +67,7 @@ def process_prescription_image(image_bytes: bytes) -> str:
     image = PIL.Image.open(io.BytesIO(image_bytes))
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         contents=[PROMPT, image],
     )
 
