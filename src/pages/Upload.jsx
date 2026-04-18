@@ -32,6 +32,7 @@ export default function UploadPage() {
   // Shared Results State
   const [ocrResult, setOcrResult] = useState(null); // array of meds
   const [ocrError, setOcrError] = useState(null);
+  const [ocrConfidence, setOcrConfidence] = useState(null); // { score, label, medicines_detected }
 
   const fileInputRef = useRef(null);
 
@@ -65,6 +66,7 @@ export default function UploadPage() {
     setPreview(null);
     setOcrResult(null);
     setOcrError(null);
+    setOcrConfidence(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -125,6 +127,7 @@ export default function UploadPage() {
       }
 
       setOcrResult(results);
+      setOcrConfidence(data.confidence || null);
     } catch (err) {
       console.error("OCR Error:", err);
       setOcrError(err.message || 'OCR failed. Please check the backend is running.');
@@ -362,6 +365,46 @@ export default function UploadPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Confidence Score Badge */}
+                    {ocrConfidence && (
+                      <div className="mt-4 px-1">
+                        <div className="bg-gradient-to-br from-slate-50 to-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold uppercase tracking-widest text-gray-400">OCR Confidence</span>
+                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                              ocrConfidence.label === 'High' ? 'bg-emerald-100 text-emerald-700' :
+                              ocrConfidence.label === 'Medium' ? 'bg-amber-100 text-amber-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>{ocrConfidence.label}</span>
+                          </div>
+                          <div className="flex items-end gap-3">
+                            <span className={`text-3xl font-black tabular-nums ${
+                              ocrConfidence.label === 'High' ? 'text-emerald-600' :
+                              ocrConfidence.label === 'Medium' ? 'text-amber-500' :
+                              'text-red-500'
+                            }`}>{ocrConfidence.score}%</span>
+                            <span className="text-sm text-gray-400 font-medium mb-0.5">
+                              {ocrConfidence.medicines_detected} medicine{ocrConfidence.medicines_detected !== 1 ? 's' : ''} detected
+                            </span>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="mt-3 w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                                ocrConfidence.label === 'High' ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' :
+                                ocrConfidence.label === 'Medium' ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
+                                'bg-gradient-to-r from-red-400 to-red-500'
+                              }`}
+                              style={{ width: `${ocrConfidence.score}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                            Based on field completeness of extracted medicine data.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Column: Loading / Results */}

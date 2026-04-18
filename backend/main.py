@@ -54,9 +54,43 @@ async def process_prescription(file: UploadFile = File(...)):
 
         final_data = json.loads(text)
 
+        # --- Compute real confidence score ---
+        # Check completeness of the 7 key fields for each extracted medicine.
+        # A field is "confident" if it is present, non-null, and non-empty.
+        KEY_FIELDS = ["medicine_name", "frequency", "duration", "description", "morning", "afternoon", "evening"]
+
+        def _field_present(val):
+            if val is None:
+                return False
+            if isinstance(val, bool):
+                return True  # bool fields (morning/afternoon/evening) are always populated
+            return str(val).strip() != ""
+
+        if final_data and isinstance(final_data, list) and len(final_data) > 0:
+            per_med_scores = []
+            for med in final_data:
+                filled = sum(1 for f in KEY_FIELDS if _field_present(med.get(f)))
+                per_med_scores.append(filled / len(KEY_FIELDS))
+            avg_score = sum(per_med_scores) / len(per_med_scores)
+            # Scale: field completeness maps directly to confidence (0-100%)
+            confidence_score = round(avg_score * 100, 1)
+            fields_detected = len(final_data)
+        else:
+            confidence_score = 0.0
+            fields_detected = 0
+
         return {
             "status": "success",
             "extracted_data": final_data,
+            "confidence": {
+                "score": confidence_score,          # e.g. 92.3
+                "medicines_detected": fields_detected,
+                "label": (
+                    "High" if confidence_score >= 80
+                    else "Medium" if confidence_score >= 50
+                    else "Low"
+                ),
+            },
         }
 
     except json.JSONDecodeError:

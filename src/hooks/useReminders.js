@@ -137,8 +137,10 @@ export function useReminders({ meds = [], userId = null, journeyId = null, onSta
   }, [userId]);
 
   // ── Send test notification (via SW registration — most reliable) ──
-  const sendTestNotification = useCallback(async () => {
-    console.log('[MedCare] Sending test notification. Permission:', Notification.permission);
+  const sendTestNotification = useCallback(async (medsOverride) => {
+    // medsOverride: pass only untaken medicines from the dashboard
+    const targetMeds = (medsOverride && medsOverride.length > 0) ? medsOverride : meds;
+    console.log('[MedCare] Sending test notification for meds:', targetMeds.map(m => m.name || m.medicine_name));
     
     // Step 1: Request permission if not granted
     if (Notification.permission !== 'granted') {
@@ -157,18 +159,20 @@ export function useReminders({ meds = [], userId = null, journeyId = null, onSta
       }
     }
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const medPayload = targetMeds.slice(0, 5).map(m => ({ name: m.name || m.medicine_name || 'Medicine' }));
+
     // Step 2: Check service worker support
     if (!('serviceWorker' in navigator)) {
       // Fallback: use Notification API directly
       try {
-        const medNames = meds.slice(0, 3).map(m => m.name || m.medicine_name || 'Medicine').join(', ');
-        new Notification('💊 MedCare Reminder Test', {
-          body: meds.length > 0
-            ? `You have medicines to take: ${medNames}`
+        const medNames = medPayload.map(m => m.name).join(', ');
+        new Notification('💊 MedCare Reminder', {
+          body: targetMeds.length > 0
+            ? `Pending: ${medNames}`
             : 'Your reminder system is working correctly!',
           icon: '/favicon.svg',
         });
-        console.log('[MedCare] Notification sent via Notification API fallback.');
       } catch (e) {
         console.error('[MedCare] Fallback notification failed:', e);
       }
@@ -177,55 +181,47 @@ export function useReminders({ meds = [], userId = null, journeyId = null, onSta
 
     // Step 3: Ensure service worker is registered and ready
     try {
-      // Re-register to make sure SW is active
       await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       const reg = await navigator.serviceWorker.ready;
       
       if (!reg.active) {
-        console.warn('[MedCare] SW not active yet, waiting...');
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      const medNames = meds.slice(0, 3).map(m => m.name || m.medicine_name || 'Medicine').join(', ');
-      const todayStr = new Date().toISOString().split('T')[0];
-
-      // Send via SW message for full reminder experience (with action buttons)
+      // Send via SW message for full reminder experience (with ✅ Taken / ❌ Not Taken buttons)
       if (reg.active) {
         reg.active.postMessage({
           type: 'TEST_NOTIFICATION',
           payload: {
             slotKey: `${todayStr}|test`,
-            label: 'Test',
-            medicines: meds.slice(0, 3).map(m => ({ name: m.name || m.medicine_name || 'Medicine' })),
+            label: 'Reminder',
+            medicines: medPayload,
+            userId,
+            journeyId,
           }
         });
         console.log('[MedCare] Test notification sent via SW message.');
       } else {
-        // Fallback: show directly via registration
-        await reg.showNotification('💊 MedCare Reminder Test', {
-          body: meds.length > 0
-            ? `You have medicines to take: ${medNames}`
-            : 'Your reminder system is working correctly!',
+        // Fallback: show directly via registration (no action buttons)
+        const medNames = medPayload.map(m => m.name).join(', ');
+        await reg.showNotification('💊 MedCare Reminder', {
+          body: targetMeds.length > 0 ? `Pending: ${medNames}` : 'Your reminder system is working correctly!',
           icon: '/favicon.svg',
           badge: '/favicon.svg',
           tag: 'medcare-test',
           renotify: true,
         });
-        console.log('[MedCare] Notification sent via SW registration fallback.');
       }
     } catch (err) {
       console.error('[MedCare] Failed to show notification:', err);
-      // Last resort fallback: direct Notification API
       try {
-        new Notification('💊 MedCare Reminder Test', {
-          body: 'Your reminder system is working correctly!',
-        });
+        new Notification('💊 MedCare Reminder', { body: 'Your reminder system is working correctly!' });
       } catch (e) {
         console.error('[MedCare] All notification methods failed:', e);
         alert('Notifications failed. Please check your browser settings.');
       }
     }
-  }, [meds]);
+  }, [meds, userId, journeyId]);
 
   return {
     permissionGranted: permissionState === 'granted',
