@@ -19,24 +19,6 @@ const emptyMed = () => ({
   evening: false,
 });
 
-const fetchRealPrices = async (meds) => {
-  try {
-    const promises = meds.map(async (med) => {
-      const res = await fetch(`${OCR_API_URL}/api/v1/search-medicine?q=${encodeURIComponent(med.name)}`);
-      if (!res.ok) throw new Error('Failed to fetch prices');
-      const data = await res.json();
-      return {
-        medicineName: med.name,
-        options: data.results || []
-      };
-    });
-    return await Promise.all(promises);
-  } catch (err) {
-    console.error(err);
-    return [];
-  }
-};
-
 export default function UploadPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('image'); // 'image' | 'manual'
@@ -49,7 +31,6 @@ export default function UploadPage() {
   
   // Shared Results State
   const [ocrResult, setOcrResult] = useState(null); // array of meds
-  const [priceData, setPriceData] = useState(null);
   const [ocrError, setOcrError] = useState(null);
 
   const fileInputRef = useRef(null);
@@ -67,7 +48,6 @@ export default function UploadPage() {
       setPreview('pdf'); // Basic pdf indicator
     }
     setOcrResult(null);
-    setPriceData(null);
   }, []);
 
   // --- Drag & Drop ---
@@ -84,7 +64,6 @@ export default function UploadPage() {
     setFile(null);
     setPreview(null);
     setOcrResult(null);
-    setPriceData(null);
     setOcrError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -94,7 +73,6 @@ export default function UploadPage() {
     if (!file) return;
     setUploading(true);
     setOcrResult(null);
-    setPriceData(null);
     setOcrError(null);
 
     try {
@@ -147,8 +125,6 @@ export default function UploadPage() {
       }
 
       setOcrResult(results);
-      const realPrices = await fetchRealPrices(results);
-      setPriceData(realPrices);
     } catch (err) {
       console.error("OCR Error:", err);
       setOcrError(err.message || 'OCR failed. Please check the backend is running.');
@@ -176,9 +152,6 @@ export default function UploadPage() {
     setUploading(true);
     setOcrResult(filled);
     
-    const realPrices = await fetchRealPrices(filled);
-    setPriceData(realPrices);
-    
     setShowManualResults(true);
     setUploading(false);
   };
@@ -191,8 +164,7 @@ export default function UploadPage() {
         user_id: user.id,
         status: 'active',
         source: activeTab,
-        extracted_data: ocrResult,
-        price_comparison: priceData
+        extracted_data: ocrResult
       }]);
       
       if (error) {
@@ -207,266 +179,254 @@ export default function UploadPage() {
   const resetManual = () => {
     setShowManualResults(false);
     setOcrResult(null);
-    setPriceData(null);
   };
 
-  // --- Render Helpers ---
-  const renderMedicineCards = () => (
-    <div className="space-y-4 mb-8">
-      <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-        Extracted Medicines
-      </h3>
-      <div className="space-y-3">
-        {ocrResult.map((med, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] p-4 flex gap-4 items-start hover:shadow-md transition-shadow">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-sky-500 flex items-center justify-center font-bold text-lg shrink-0">
-              {i + 1}
-            </div>
-            <div className="space-y-2 w-full">
-              <div>
-                <h4 className="font-semibold text-gray-900 text-base">{med.name}</h4>
-                {med.description && <p className="text-sm text-gray-500 mt-0.5">{med.description}</p>}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
-                <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                  <Clock className="w-4 h-4 text-sky-500 shrink-0" />
-                  <div className="flex items-center gap-1.5">
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${med.morning ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-400'}`}>Morning</span>
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${med.afternoon ? 'bg-sky-100 text-sky-700' : 'bg-gray-200 text-gray-400'}`}>Afternoon</span>
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${med.evening ? 'bg-violet-100 text-violet-700' : 'bg-gray-200 text-gray-400'}`}>Evening</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                  <Calendar className="w-4 h-4 text-sky-500 shrink-0" />
-                  <span className="font-medium truncate">{med.duration}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderPriceComparison = () => {
-    const totalSavings = priceData?.reduce((acc, curr) => {
-      const maxSaving = curr.options.length > 0 ? Math.max(...curr.options.map(o => o.savings)) : 0;
-      return acc + maxSaving;
-    }, 0) || 0;
-
+  const renderCombinedResults = () => {
     return (
-      <div className="space-y-4 mb-8 bg-blue-50/50 rounded-2xl p-5 sm:p-6 border border-blue-100">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <IndianRupee className="w-5 h-5 text-sky-500" />
-          Real-Time Price Comparison
-        </h3>
-        <div className="space-y-5">
-          {priceData?.map((data, i) => (
-            <div key={i} className="space-y-3">
-              <h4 className="font-semibold text-gray-700 text-sm border-b border-blue-100 pb-1">{data.medicineName}</h4>
-              {data.options.length === 0 ? (
-                <p className="text-sm text-gray-500 italic bg-white p-3 rounded-xl border border-gray-100">No prices found online.</p>
-              ) : (
-                data.options.map((opt, j) => (
-                  <div key={j} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm mb-1">{opt.medicineName}</p>
-                      <div className="flex items-center gap-3 text-xs">
-                        <span className="text-gray-500 line-through">MRP: ₹{opt.brandedPrice}</span>
-                        <span className="font-semibold text-sky-500">Sale Price: ₹{opt.janAushadhiPrice}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 shrink-0 mt-2 sm:mt-0 justify-between sm:justify-end">
-                      <div className="text-right">
-                        <p className="text-xs text-gray-500">Savings</p>
-                        <p className="font-bold text-emerald-500 flex items-center justify-end">
-                          <IndianRupee className="w-3.5 h-3.5" />
-                          {opt.savings}
-                        </p>
-                      </div>
-                      <a href={opt.buyLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                        Buy Now
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          ))}
+      <div className="space-y-8 mb-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-xl border border-sky-100 rounded-[2rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+           <h3 className="text-xl font-black text-gray-900 flex items-center gap-3">
+             <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shadow-inner">
+               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+             </div>
+             Medicines Extracted
+           </h3>
         </div>
-        <div className="bg-emerald-50 text-emerald-700 text-sm font-semibold p-4 rounded-xl border border-emerald-100 flex items-center justify-between mt-4">
-          <span>Max Est. Savings:</span>
-          <span className="text-lg font-bold">₹{totalSavings.toFixed(2)}</span>
+
+        <div className="space-y-6">
+          {ocrResult.map((med, i) => {
+             return (
+              <div key={i} className="group relative bg-white rounded-[2rem] border border-gray-100/50 p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] transition-all duration-300">
+                <div className="bg-gray-50/50 rounded-[1.8rem] p-5 sm:p-6">
+                    <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-center">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brandBlue to-sky-400 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-sky-500/30 shrink-0">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-gray-900 text-lg">{med.name}</h4>
+                        {med.description && <p className="text-sm text-gray-500 mt-1">{med.description}</p>}
+                      </div>
+                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm">
+                          <Clock className="w-4 h-4 text-sky-500" />
+                          <div className="flex gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${med.morning ? 'bg-emerald-400 ring-2 ring-emerald-100' : 'bg-gray-200'}`} title="Morning" />
+                            <span className={`w-2 h-2 rounded-full ${med.afternoon ? 'bg-sky-400 ring-2 ring-sky-100' : 'bg-gray-200'}`} title="Afternoon" />
+                            <span className={`w-2 h-2 rounded-full ${med.evening ? 'bg-violet-400 ring-2 ring-violet-100' : 'bg-gray-200'}`} title="Evening" />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm">
+                          <Calendar className="w-4 h-4 text-sky-500" />
+                          <span className="font-semibold text-gray-700 text-sm">{med.duration}</span>
+                        </div>
+                      </div>
+                    </div>
+                </div>
+              </div>
+             )
+          })}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen w-full bg-dotted overflow-hidden flex flex-col">
+    <div className="min-h-screen w-full bg-[#f8fafc] bg-dotted overflow-hidden flex flex-col relative">
+      
+      {/* Background Ambience Elements */}
+      <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-gradient-to-br from-sky-200/40 to-blue-300/20 rounded-full blur-[120px] pointer-events-none mix-blend-multiply hidden lg:block" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-gradient-to-tr from-indigo-200/30 to-violet-200/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply hidden lg:block" />
+
       {/* Navbar */}
-      <header className="w-full max-w-6xl mx-auto flex items-center justify-between py-5 px-4 z-10">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="grid grid-cols-2 gap-1 bg-white p-1.5 rounded-lg shadow-sm border border-gray-100">
+      <header className="w-full max-w-7xl mx-auto flex items-center justify-between py-6 px-6 sm:px-8 z-10 relative">
+        <Link to="/" className="flex items-center gap-3 group">
+          <div className="grid grid-cols-2 gap-1 bg-white p-2 rounded-xl shadow-[0_4px_15px_rgb(0,0,0,0.05)] border border-gray-100 group-hover:shadow-[0_8px_25px_rgba(46,116,255,0.15)] transition-all">
             <div className="w-2.5 h-2.5 rounded-full bg-brandBlue" />
             <div className="w-2.5 h-2.5 rounded-full bg-gray-800" />
             <div className="w-2.5 h-2.5 rounded-full bg-gray-800" />
             <div className="w-2.5 h-2.5 rounded-full bg-gray-800" />
           </div>
-          <span className="font-semibold text-xl tracking-tight text-gray-900">MedCare</span>
+          <span className="font-black text-2xl tracking-tight text-gray-900">MedCare</span>
         </Link>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center py-6 sm:py-10 px-4">
+      <main className="flex-1 flex flex-col items-center py-8 sm:py-12 px-4 sm:px-8 relative z-10">
         <div className="w-full max-w-6xl">
           
           {/* Header Texts */}
-          <div className="text-center mb-8 max-w-2xl mx-auto">
-            <h1 className="text-3xl sm:text-4xl font-semibold text-gray-900 tracking-tight mb-4">
-              Upload your prescription
+          <div className="text-center mb-12 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-sky-100 shadow-sm mb-6">
+              <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
+              <span className="text-xs font-bold uppercase tracking-widest text-sky-600">AI-Powered Extraction</span>
+            </div>
+            <h1 className="text-4xl sm:text-5xl font-black text-gray-900 tracking-tight mb-6 leading-tight">
+              Digitize your prescription <br className="hidden sm:block"/> in seconds.
             </h1>
-            <p className="text-gray-500 text-base sm:text-lg font-medium leading-relaxed">
-              Take a photo of your prescription, discharge summary or lab report — or enter medicines manually. Our AI will extract the details.
+            <p className="text-gray-500 text-lg sm:text-xl font-medium leading-relaxed max-w-2xl mx-auto">
+              Upload a photo or enter medicines manually. Our agent extracts the details and finds you the absolute best prices online.
             </p>
           </div>
 
           {/* Tab Switcher */}
-          <div className="flex justify-center mb-8">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_4px_20px_rgb(0,0,0,0.04)] p-1.5 flex flex-wrap sm:flex-nowrap gap-1 w-full max-w-md">
+          <div className="flex justify-center mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
+            <div className="bg-white/80 backdrop-blur-md rounded-2xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-2 flex flex-wrap sm:flex-nowrap gap-2 w-full max-w-md relative z-20">
               <button
                 onClick={() => { setActiveTab('image'); clearFile(); }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${activeTab === 'image' ? 'bg-brandBlue text-white shadow-md shadow-sky-500/20' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === 'image' ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/30' : 'text-gray-500 hover:text-sky-600 hover:bg-sky-50'}`}
               >
-                📸 Upload Image
+                <Camera className="w-4 h-4" /> Upload Image
               </button>
               <button
                 onClick={() => { setActiveTab('manual'); }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${activeTab === 'manual' ? 'bg-brandBlue text-white shadow-md shadow-sky-500/20' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === 'manual' ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/30' : 'text-gray-500 hover:text-sky-600 hover:bg-sky-50'}`}
               >
-                ✏️ Manual Entry
+                <PenLine className="w-4 h-4" /> Manual Entry
               </button>
             </div>
           </div>
 
           {/* ----- IMAGE TAB CONTENT ----- */}
           {activeTab === 'image' && (
-            <div className="w-full">
+            <div className="w-full animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
               {!file ? (
                 // State 1: Upload Zone
-                <div className="max-w-2xl mx-auto bg-white rounded-[2rem] border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.06)] p-6 sm:p-10">
-                  <div
-                    onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`relative border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-5 cursor-pointer transition-all py-20 px-6 text-center ${dragging ? 'border-sky-500 bg-blue-50/60 scale-[1.01]' : 'border-gray-200 hover:border-sky-500 hover:bg-blue-50/30'}`}
-                  >
-                    <div className="w-20 h-20 rounded-[1.5rem] bg-white shadow-md flex items-center justify-center border border-gray-100">
-                      <Camera className="w-8 h-8 text-sky-500" />
+                <div className="max-w-3xl mx-auto">
+                  <div className="relative group">
+                    {/* Glowing effect behind the dropzone */}
+                    <div className="absolute inset-[-4px] bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 rounded-[2.5rem] blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500 -z-10" />
+                    
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                      onDragLeave={() => setDragging(false)}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`relative bg-white/80 backdrop-blur-xl border-[3px] border-dashed rounded-[2rem] flex flex-col items-center justify-center gap-6 cursor-pointer transition-all duration-300 py-24 px-8 text-center overflow-hidden
+                        ${dragging ? 'border-sky-500 bg-sky-50/80 scale-[1.02]' : 'border-gray-200 hover:border-sky-400 hover:bg-white'}`}
+                    >
+                      <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-gray-50 to-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex items-center justify-center border border-gray-100 group-hover:-translate-y-2 transition-transform duration-500">
+                        <UploadIcon className="w-10 h-10 text-sky-500" />
+                      </div>
+                      <div>
+                        <p className="text-gray-900 font-black text-2xl tracking-tight mb-2">
+                          {dragging ? 'Drop prescription here' : 'Drag & drop your document'}
+                        </p>
+                        <p className="text-gray-400 text-sm font-semibold uppercase tracking-widest">
+                          Supports JPG, PNG, PDF up to 10MB
+                        </p>
+                      </div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg, image/png, application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) acceptFile(f);
+                        }}
+                      />
                     </div>
-                    <div>
-                      <p className="text-gray-900 font-semibold text-lg mb-1">
-                        {dragging ? 'Drop prescription here' : 'Click or drag & drop to upload'}
-                      </p>
-                      <p className="text-gray-400 text-sm font-medium">
-                        Accepts .jpg, .png, .pdf up to 10MB
-                      </p>
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/jpeg, image/png, application/pdf"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) acceptFile(f);
-                      }}
-                    />
                   </div>
                 </div>
               ) : (
                 // State 2: 2-Column Split View (Preview + Extraction/Results)
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-8 items-start">
                   {/* Left Column: Image Preview */}
-                  <div className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.06)] p-6 lg:sticky lg:top-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                        <FileImage className="w-5 h-5 text-sky-500" />
-                        Uploaded Document
+                  <div className="bg-white rounded-[2.5rem] border border-gray-100/60 shadow-[0_20px_50px_rgb(0,0,0,0.06)] p-6 lg:sticky lg:top-8">
+                    <div className="flex items-center justify-between mb-5 px-2">
+                      <h3 className="font-black text-gray-900 text-lg flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                          <FileImage className="w-4 h-4 text-gray-600" />
+                        </div>
+                        Source Document
                       </h3>
-                      <button onClick={clearFile} className="text-gray-400 hover:text-red-500 transition-colors p-1 bg-gray-50 rounded-lg">
+                      <button onClick={clearFile} className="text-gray-400 hover:text-white hover:bg-red-500 transition-all p-2 rounded-full">
                         <X className="w-5 h-5" />
                       </button>
                     </div>
-                    <div className="rounded-[1.5rem] overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center relative group h-[400px] sm:h-[500px]">
+                    <div className="rounded-[2rem] overflow-hidden border border-gray-100/50 bg-gray-50/50 flex items-center justify-center relative group w-full min-h-[300px] shadow-inner">
                       {preview === 'pdf' ? (
-                        <div className="text-center">
+                        <div className="text-center py-20">
                           <FileImage className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-                          <p className="text-gray-500 font-medium">PDF Document</p>
+                          <p className="text-gray-500 font-bold">PDF Document</p>
                           <p className="text-gray-400 text-sm">{file.name}</p>
                         </div>
                       ) : (
-                        <img src={preview} alt="Prescription" className="w-full h-full object-contain" />
+                        <img src={preview} alt="Prescription" className="w-full max-h-[70vh] object-contain rounded-[2rem]" />
+                      )}
+                      
+                      {/* Scanning Animation */}
+                      {uploading && (
+                        <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden rounded-[2rem] bg-sky-900/10 backdrop-blur-[1px]">
+                          <div className="absolute w-full h-[4px] bg-gradient-to-r from-transparent via-sky-400 to-transparent shadow-[0_0_25px_8px_rgba(56,189,248,0.6)] animate-scan" />
+                        </div>
                       )}
                     </div>
                   </div>
 
                   {/* Right Column: Loading / Results */}
-                  <div className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_20px_50px_rgb(0,0,0,0.06)] p-6 sm:p-8 min-h-[400px] sm:min-h-[550px] flex flex-col">
+                  <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] border border-white shadow-[0_20px_50px_rgb(0,0,0,0.06)] p-6 sm:p-10 min-h-[450px] sm:min-h-[600px] flex flex-col relative overflow-hidden">
                     {!ocrResult ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
+                      <div className="flex-1 flex flex-col items-center justify-center text-center relative z-10">
                         {ocrError ? (
-                          <>
-                            <div className="w-20 h-20 bg-red-50 rounded-[1.5rem] flex items-center justify-center mb-6">
-                              <AlertCircle className="w-8 h-8 text-red-400" />
+                          <div className="animate-in zoom-in-95 duration-500">
+                            <div className="w-24 h-24 bg-red-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner border border-red-100">
+                              <AlertCircle className="w-10 h-10 text-red-500" />
                             </div>
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2">Extraction Failed</h3>
-                            <p className="text-red-500 text-sm font-medium mb-1 px-4">{ocrError}</p>
-                            <p className="text-gray-400 text-xs mb-6">Check browser console (F12) for details.</p>
+                            <h3 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Extraction Interrupted</h3>
+                            <p className="text-red-500 font-medium mb-8 px-4 max-w-md mx-auto">{ocrError}</p>
                             <button
                               onClick={handleExtract}
-                              className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-3 px-6 rounded-2xl shadow-lg shadow-sky-500/30 transition-all"
+                              className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-bold py-4 px-8 rounded-2xl shadow-xl hover:-translate-y-1 transition-all duration-300"
                             >
                               <Pill className="w-5 h-5" /> Try Again
                             </button>
-                          </>
+                          </div>
                         ) : !uploading ? (
-                          <>
-                            <div className="w-20 h-20 bg-blue-50 rounded-[1.5rem] flex items-center justify-center mb-6">
-                              <UploadIcon className="w-8 h-8 text-sky-500" />
+                          <div className="animate-in zoom-in-95 duration-500 max-w-md mx-auto">
+                            <div className="relative w-24 h-24 mx-auto mb-8">
+                              <div className="absolute inset-0 bg-sky-200 rounded-[2rem] blur-xl opacity-60 animate-pulse" />
+                              <div className="relative w-full h-full bg-gradient-to-br from-white to-sky-50 rounded-[2rem] flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white">
+                                <UploadIcon className="w-10 h-10 text-sky-500" />
+                              </div>
                             </div>
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2">Ready to extract</h3>
-                            <p className="text-gray-500 mb-8 max-w-sm">Our AI will read the medicines, dosages, and schedules from your uploaded file.</p>
+                            <h3 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">Ready to process</h3>
+                            <p className="text-gray-500 text-lg mb-10 leading-relaxed">Our clinical AI will scan this document to extract medicines and dosages automatically.</p>
                             <button
                               onClick={handleExtract}
-                              className="w-full max-w-xs flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-sky-500/30 transition-all hover:scale-[1.02] active:scale-95"
+                              className="w-full group relative flex items-center justify-center gap-3 bg-gradient-to-r from-sky-500 to-indigo-500 text-white font-bold py-5 px-8 rounded-[1.5rem] shadow-[0_10px_40px_rgba(56,189,248,0.4)] transition-all duration-300 hover:shadow-[0_20px_50px_rgba(56,189,248,0.6)] hover:-translate-y-1 overflow-hidden"
                             >
-                              <Pill className="w-5 h-5" />
-                              Extract Medicines
+                              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+                              <Pill className="w-6 h-6 relative z-10" />
+                              <span className="text-lg relative z-10">Extract</span>
                             </button>
-                          </>
+                          </div>
                         ) : (
-                          <>
-                            <Loader2 className="w-12 h-12 text-sky-500 animate-spin mb-6" />
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2">Extracting medicines...</h3>
-                            <p className="text-gray-500">Scanning document for names, frequency, and duration.</p>
-                          </>
+                          <div className="animate-in fade-in duration-500 flex flex-col items-center">
+                            <div className="relative w-24 h-24 mb-8">
+                              <div className="absolute inset-0 rounded-full border-[4px] border-sky-100" />
+                              <div className="absolute inset-0 rounded-full border-[4px] border-sky-500 border-t-transparent animate-spin" />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <Pill className="w-8 h-8 text-sky-500 animate-pulse" />
+                              </div>
+                            </div>
+                            <h3 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Analyzing Document</h3>
+                            <p className="text-gray-500 text-lg max-w-sm">Detecting medical terms and formatting your schedule...</p>
+                          </div>
                         )}
                       </div>
                     ) : (
-                      <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {renderMedicineCards()}
-                        {renderPriceComparison()}
-                        <div className="mt-auto pt-4">
+                      <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-8 duration-700">
+                        {renderCombinedResults()}
+                        <div className="mt-auto pt-6">
                           <button
                             onClick={handleActivate}
-                            className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-4 rounded-2xl shadow-[0_10px_25px_rgba(46,116,255,0.3)] transition-all hover:scale-[1.01] active:scale-[0.99] text-lg"
+                            className="w-full group flex items-center justify-between bg-gradient-to-r from-sky-500 to-brandBlue hover:from-sky-600 hover:to-blue-700 text-white font-bold py-5 px-8 rounded-2xl shadow-xl shadow-sky-500/20 transition-all hover:-translate-y-1"
                           >
-                            Continue to Activate MedCare Agent
-                            <ArrowRight className="w-5 h-5" />
+                            <span className="text-lg">Activate Agent Tracker</span>
+                            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                              <ArrowRight className="w-5 h-5" />
+                            </div>
                           </button>
                         </div>
                       </div>
@@ -581,9 +541,9 @@ export default function UploadPage() {
                         className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-4 rounded-2xl shadow-lg shadow-sky-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] text-lg disabled:opacity-70 disabled:hover:scale-100"
                       >
                         {uploading ? (
-                          <><Loader2 className="w-5 h-5 animate-spin" /> Fetching Prices...</>
+                          <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
                         ) : (
-                          <>Preview & Compare Prices <ArrowRight className="w-5 h-5" /></>
+                          <>Preview Medicines <ArrowRight className="w-5 h-5" /></>
                         )}
                       </button>
                     </div>
@@ -597,15 +557,16 @@ export default function UploadPage() {
                       <PenLine className="w-4 h-4" /> Edit Manual Entry
                     </button>
                   </div>
-                  {renderMedicineCards()}
-                  {renderPriceComparison()}
+                  {renderCombinedResults()}
                   <div className="mt-8">
                     <button
                       onClick={handleActivate}
-                      className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-4 rounded-2xl shadow-[0_10px_25px_rgba(46,116,255,0.3)] transition-all hover:scale-[1.01] active:scale-[0.99] text-lg"
+                      className="w-full group flex items-center justify-between bg-gradient-to-r from-sky-500 to-brandBlue hover:from-sky-600 hover:to-blue-700 text-white font-bold py-5 px-8 rounded-2xl shadow-xl shadow-sky-500/20 transition-all hover:-translate-y-1"
                     >
-                      Continue to Activate MedCare Agent
-                      <ArrowRight className="w-5 h-5" />
+                      <span className="text-lg">Activate Agent Tracker</span>
+                      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                        <ArrowRight className="w-5 h-5" />
+                      </div>
                     </button>
                   </div>
                 </div>

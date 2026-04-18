@@ -6,6 +6,7 @@ import Signup from './pages/Signup';
 import Upload from './pages/Upload';
 import AgentDashboard from './pages/AgentDashboard';
 import Chatbot from './pages/Chatbot';
+import MyMedicines from './pages/MyMedicines';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
         <Route path="/home" element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
         <Route path="/agent/:journeyId" element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
         <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
+        <Route path="/my-medicines" element={<ProtectedRoute><MyMedicines /></ProtectedRoute>} />
       </Routes>
     </Router>
   );

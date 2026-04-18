@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RadialBarChart, RadialBar, ResponsiveContainer } from 'recharts';
-import { LayoutDashboard, Inbox, Bell, Search, ChevronRight, Sun, Sunset, Moon, Upload, LogOut, FileText } from 'lucide-react';
+import { LayoutDashboard, Inbox, Bell, Search, ChevronRight, Sun, Sunset, Moon, Upload, LogOut, FileText, Pill } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useReminders, loadRecentLogs } from '../hooks/useReminders';
 
@@ -244,12 +243,6 @@ export default function AgentDashboard() {
   const weeklyAvg = Math.round(weeklyData.reduce((a, d) => a + d.taken, 0) / weeklyData.length);
   const journeyPct = Math.min(100, Math.round((journeyDay / journeyDuration) * 100));
 
-  const radialData = [
-    { name: 'Today', value: Math.max(4, todayPct), fill: '#38bdf8' },
-    { name: 'Weekly', value: Math.max(4, weeklyAvg), fill: '#10b981' },
-    { name: 'Journey', value: Math.max(4, journeyPct), fill: '#f59e0b' },
-  ];
-
   const getMedProgress = (med) => {
     if (!firstJourney) return 0;
     const days = Math.floor((now - new Date(firstJourney.created_at)) / 86400000);
@@ -293,27 +286,16 @@ export default function AgentDashboard() {
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">General</p>
             <nav className="space-y-1">
               <button className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-100 rounded-xl text-gray-900 font-medium text-sm">
-                <div className="flex items-center gap-3"><LayoutDashboard className="w-4 h-4 text-gray-500" /> Home</div>
+                <div className="flex items-center gap-3"><LayoutDashboard className="w-4 h-4 text-sky-500" /> Home</div>
               </button>
               <button onClick={() => navigate('/chatbot')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
                 <div className="flex items-center gap-3"><Inbox className="w-4 h-4" /> Agent Chat</div>
               </button>
+              <button onClick={() => navigate('/my-medicines')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
+                <div className="flex items-center gap-3"><Pill className="w-4 h-4" /> My Medicine</div>
+              </button>
             </nav>
           </div>
-
-          {meds.length > 0 && (
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">My Medicines</p>
-              <nav className="space-y-1">
-                {meds.map((med, idx) => (
-                  <div key={idx} className="w-full flex items-center gap-3 px-3 py-2 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm truncate">
-                    <span>💊</span>
-                    <span className="truncate">{med.name}</span>
-                  </div>
-                ))}
-              </nav>
-            </div>
-          )}
 
           <div className="pt-4 mt-4 border-t border-gray-100">
             <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500 hover:bg-rose-50 rounded-xl font-medium text-sm transition-colors">
@@ -349,7 +331,7 @@ export default function AgentDashboard() {
           </div>
         </header>
 
-        <div className="px-8 py-6 w-full max-w-7xl mx-auto space-y-6">
+        <div className="px-8 py-6 w-full max-w-[1600px] mx-auto space-y-6">
           <h1 className="text-3xl font-medium text-gray-800 tracking-tight">
             {getGreeting()}, <span className="font-bold text-gray-900">{userName || '...'}</span>
             {todayTotal > 0 && (
@@ -490,33 +472,26 @@ export default function AgentDashboard() {
               {/* Right: Activity + Progress */}
               <div className="col-span-4 flex flex-col gap-5">
                 <div className="bg-white rounded-[1.5rem] p-6 shadow-[0_4px_20px_rgb(0,0,0,0.04)] border border-gray-100">
-                  <h3 className="text-base font-semibold text-gray-900 mb-4">Adherence Overview</h3>
-                  <div className="flex items-center">
-                    <div className="flex-1 space-y-4">
-                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Journey Progress</p>
-                        <p className="text-xl font-bold text-gray-900">Day {journeyDay}<span className="text-sm text-gray-400 font-medium"> / {journeyDuration}</span></p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Today's Doses</p>
-                        <p className="text-xl font-bold text-gray-900">{todayChecked}/{todayTotal}
-                          <span className={`text-sm font-semibold ml-1.5 ${todayPct >= 80 ? 'text-emerald-500' : todayPct >= 40 ? 'text-amber-500' : 'text-rose-400'}`}>
-                            {todayPct >= 80 ? 'On Track' : todayPct >= 40 ? 'In Progress' : 'Start Now'}
-                          </span>
-                        </p>
-                      </div>
-                      <div className="flex gap-2 text-[10px] font-bold">
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400 inline-block"/>Today {todayPct}%</span>
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"/>Weekly {weeklyAvg}%</span>
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"/>Journey {journeyPct}%</span>
-                      </div>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-base font-semibold text-gray-900">Adherence Overview</h3>
+                    <span className={`text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-md border ${todayPct >= 80 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : todayPct >= 40 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-rose-500 border-rose-100'}`}>
+                      {todayPct >= 80 ? 'On Track' : todayPct >= 40 ? 'In Progress' : 'Action Needed'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center px-4">
+                    <CircularRing percentage={todayPct} color="text-blue-500" label="Today" />
+                    <CircularRing percentage={weeklyAvg} color="text-emerald-500" label="Weekly" />
+                    <CircularRing percentage={journeyPct} color="text-amber-500" label="Journey" />
+                  </div>
+                  <div className="mt-6 flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Doses Today</p>
+                      <p className="text-lg font-bold text-gray-900">{todayChecked} <span className="text-sm font-medium text-gray-400">/ {todayTotal}</span></p>
                     </div>
-                    <div className="w-36 h-36">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadialBarChart cx="50%" cy="50%" innerRadius="28%" outerRadius="100%" barSize={8} data={radialData} startAngle={90} endAngle={-270}>
-                          <RadialBar minAngle={8} background={{ fill: '#f1f5f9' }} clockWise dataKey="value" cornerRadius={10} />
-                        </RadialBarChart>
-                      </ResponsiveContainer>
+                    <div className="h-8 w-px bg-gray-200"></div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Journey Day</p>
+                      <p className="text-lg font-bold text-gray-900">{journeyDay} <span className="text-sm font-medium text-gray-400">/ {journeyDuration}</span></p>
                     </div>
                   </div>
                 </div>
@@ -721,5 +696,26 @@ function CalendarIcon() {
       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
       <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
     </svg>
+  );
+}
+
+function CircularRing({ percentage, color, label }) {
+  const radius = 32;
+  const circumference = 2 * Math.PI * radius;
+  // Limit to 100 max
+  const safePct = Math.min(100, Math.max(0, percentage));
+  const strokeDashoffset = circumference - (safePct / 100) * circumference;
+  
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative w-[72px] h-[72px] flex items-center justify-center mb-3">
+        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100" />
+          <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} className={`${color} transition-all duration-1000 ease-out`} strokeLinecap="round" />
+        </svg>
+        <span className="absolute text-[15px] font-bold text-gray-900">{safePct}%</span>
+      </div>
+      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+    </div>
   );
 }

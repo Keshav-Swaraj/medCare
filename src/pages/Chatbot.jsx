@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Inbox, Send, User, Bot, Bell, Search, ChevronRight, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Inbox, Send, User, Bot, Bell, Search, ChevronRight, Loader2, Pill } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const OCR_API = import.meta.env.VITE_OCR_API_URL || 'http://localhost:8000';
@@ -126,9 +126,9 @@ export default function Chatbot() {
         <div className="p-6 flex items-center gap-2">
           <div className="grid grid-cols-2 gap-[3px] p-1.5 rounded-lg border border-gray-100">
             <div className="w-2 h-2 rounded-full bg-amber-500" />
-            <div className="w-2 h-2 rounded-full bg-sky-400" />
-            <div className="w-2 h-2 rounded-full bg-sky-400" />
-            <div className="w-2 h-2 rounded-full bg-sky-400" />
+            <div className="w-2 h-2 rounded-full bg-blue-400" />
+            <div className="w-2 h-2 rounded-full bg-blue-400" />
+            <div className="w-2 h-2 rounded-full bg-blue-400" />
           </div>
           <span className="font-semibold text-lg text-gray-900 tracking-tight">MedCare</span>
         </div>
@@ -149,26 +149,13 @@ export default function Chatbot() {
                 <div className="flex items-center gap-3"><LayoutDashboard className="w-4 h-4" /> Home</div>
               </button>
               <button className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-100 rounded-xl text-gray-900 font-medium text-sm">
-                <div className="flex items-center gap-3"><Inbox className="w-4 h-4 text-sky-500" /> Agent Chat</div>
+                <div className="flex items-center gap-3"><Inbox className="w-4 h-4 text-blue-600" /> Agent Chat</div>
+              </button>
+              <button onClick={() => navigate('/my-medicines')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
+                <div className="flex items-center gap-3"><Pill className="w-4 h-4" /> My Medicine</div>
               </button>
             </nav>
           </div>
-
-          {medicines.length > 0 && (
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">My Medicines</p>
-              <nav className="space-y-1">
-                {medicines.map((med, idx) => (
-                  <button key={idx}
-                    onClick={() => setInput(`Tell me about ${med.name}`)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors text-left truncate">
-                    <span>💊</span>
-                    <span className="truncate">{med.name}</span>
-                  </button>
-                ))}
-              </nav>
-            </div>
-          )}
         </div>
       </aside>
 
@@ -197,7 +184,7 @@ export default function Chatbot() {
 
             {loadingContext ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-400">
-                <Loader2 className="w-8 h-8 animate-spin text-sky-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                 <p className="text-sm font-medium">Loading your medical context...</p>
               </div>
             ) : (
@@ -211,13 +198,13 @@ export default function Chatbot() {
                 {messages.map((msg, idx) => (
                   <div key={idx} className={`flex items-end gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {msg.role === 'bot' && (
-                      <div className="w-8 h-8 rounded-xl bg-sky-100 flex items-center justify-center shrink-0 border border-sky-200">
-                        <Bot className="w-4 h-4 text-sky-600" />
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+                        <Bot className="w-4 h-4 text-blue-600" />
                       </div>
                     )}
                     <div className={`max-w-[75%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                       msg.role === 'user'
-                        ? 'bg-sky-500 text-white rounded-2xl rounded-tr-sm shadow-sm'
+                        ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm shadow-sm'
                         : 'bg-gray-50 text-gray-800 rounded-2xl rounded-tl-sm border border-gray-100'
                     }`}>
                       {msg.content}
@@ -232,8 +219,8 @@ export default function Chatbot() {
 
                 {sending && (
                   <div className="flex items-end gap-3 justify-start">
-                    <div className="w-8 h-8 rounded-xl bg-sky-100 flex items-center justify-center shrink-0 border border-sky-200">
-                      <Bot className="w-4 h-4 text-sky-600" />
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+                      <Bot className="w-4 h-4 text-blue-600" />
                     </div>
                     <div className="bg-gray-50 border border-gray-100 rounded-2xl rounded-tl-sm px-5 py-3.5 flex items-center gap-1.5">
                       <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -253,7 +240,7 @@ export default function Chatbot() {
                 <div className="flex gap-2 mb-3 flex-wrap">
                   {['What are the side effects?', 'When should I take my medicines?', 'Can I eat before taking my pills?', 'I missed a dose, what should I do?'].map((q, i) => (
                     <button key={i} onClick={() => setInput(q)}
-                      className="text-xs bg-sky-50 text-sky-600 border border-sky-100 px-3 py-1.5 rounded-full font-medium hover:bg-sky-100 transition-colors">
+                      className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1.5 rounded-full font-medium hover:bg-blue-100 transition-colors">
                       {q}
                     </button>
                   ))}
@@ -266,10 +253,10 @@ export default function Chatbot() {
                   onChange={e => setInput(e.target.value)}
                   placeholder="Ask about your medicines, side effects, or schedule..."
                   disabled={loadingContext || sending}
-                  className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all placeholder:text-gray-400 disabled:opacity-60"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-gray-400 disabled:opacity-60"
                 />
                 <button type="submit" disabled={!input.trim() || sending || loadingContext}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-sky-500 text-white flex items-center justify-center hover:bg-sky-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm">
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm">
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
                 </button>
               </form>
