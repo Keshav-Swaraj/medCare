@@ -1,7 +1,5 @@
 # 💊 MedCare — Your Autonomous Health Companion
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Click_Here-blue?style=for-the-badge&logo=vercel)](https://med-care-tau.vercel.app/)
-
 
 **Doctor’s visit over. Now what?**  
 MedCare transforms confusing prescriptions, complex medical scans, and dense reports into simple, actionable guidance. Designed for families and caregivers, it bridges the gap between the clinic and daily recovery with AI-driven adherence, smart reminders, and plain-language medical insights.
@@ -128,11 +126,19 @@ npm run dev
 ---
 
 ### 🙌 Why We Built This
-In many households, especially in India, the transition from the doctor's clinic to home recovery is often chaotic. Caregivers are overwhelmed, and elderly patients struggle with complex schedules. MedCare was built to provide a **bridge of clarity**—leveraging state-of-the-art AI to ensure that "Post-Visit" doesn't mean "Confusion".
+### 🙌 Why We Built MedCare
 
-### 👥 Team
-- **Keshav Swaraj** — Full Stack & AI Implementation
-- *[Add other team members here]*
+Doctor visits in India are often short and overwhelming. Patients — especially the elderly — leave with messy prescriptions they can't read, unclear instructions, and no real guidance for daily life.
+
+This leads to confusion, missed doses, and poor adherence. Non-adherence rates among elderly patients with chronic illnesses in India frequently exceed 40–60%, resulting in complications, extra hospital visits, and heavy burden on families.
+
+We built MedCare to fix this "post-visit gap".
+
+It instantly converts confusing prescriptions and reports into simple, actionable guidance: clear schedules with food precautions, smart reminders, progress tracking, plain-language explanations, and an always-available AI companion — all designed for real Indian families.
+
+---
+
+### 👥 Team W Coders
 
 ---
 
