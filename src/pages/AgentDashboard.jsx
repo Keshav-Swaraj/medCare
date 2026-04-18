@@ -332,14 +332,26 @@ export default function AgentDashboard() {
         </header>
 
         <div className="px-8 py-6 w-full max-w-[1600px] mx-auto space-y-6">
-          <h1 className="text-3xl font-medium text-gray-800 tracking-tight">
-            {getGreeting()}, <span className="font-bold text-gray-900">{userName || '...'}</span>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-medium text-gray-800 tracking-tight">
+                {getGreeting()}, <span className="font-bold text-gray-900">{userName || '...'}</span> <span className="ml-1 inline-block origin-bottom-right hover:animate-wave">👋</span>
+              </h1>
+              <p className="text-gray-500 mt-1">Here is your health overview for today.</p>
+            </div>
             {todayTotal > 0 && (
-              <span className="ml-3 text-base font-medium text-gray-400">
-                {todayChecked}/{todayTotal} doses logged today
-              </span>
+              <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-gray-100 shadow-sm">
+                <div className="relative flex items-center justify-center w-6 h-6 rounded-full bg-sky-50">
+                  <div className={`w-2 h-2 rounded-full ${todayChecked === todayTotal ? 'bg-emerald-500' : todayChecked > 0 ? 'bg-amber-400' : 'bg-gray-300'}`}></div>
+                </div>
+                <span className="text-sm font-semibold text-gray-700">
+                  <span className={todayChecked === todayTotal ? 'text-emerald-600' : 'text-gray-900'}>{todayChecked}</span>
+                  <span className="text-gray-400 mx-0.5">/</span>
+                  {todayTotal} <span className="text-gray-500 font-medium">doses logged</span>
+                </span>
+              </div>
             )}
-          </h1>
+          </div>
 
           {loading ? (
             <div className="flex justify-center items-center py-24">
@@ -424,11 +436,15 @@ export default function AgentDashboard() {
                         Reminders Active
                       </span>
                     ) : permissionDenied ? (
-                      <div className="flex flex-col items-center gap-1">
+                      <div className="flex flex-col items-center gap-1.5">
                         <span className="text-[10px] font-semibold text-rose-500 bg-rose-50 px-3 py-1 rounded-full">
                           🚫 Notifications Blocked
                         </span>
-                        <p className="text-[9px] text-gray-400 max-w-[150px]">Please reset permission in browser settings to enable reminders.</p>
+                        <p className="text-[9px] text-gray-400 max-w-[160px] text-center leading-relaxed">Click the 🔒 lock icon in the address bar → Site settings → Notifications → Allow</p>
+                        <button
+                          onClick={sendTestNotification}
+                          className="text-[10px] font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-full transition-colors"
+                        >🔄 Try Again</button>
                       </div>
                     ) : (
                       <button
@@ -438,12 +454,10 @@ export default function AgentDashboard() {
                         🔔 Enable Reminders
                       </button>
                     )}
-                    {permissionGranted && (
-                      <button
-                        onClick={sendTestNotification}
-                        className="text-[10px] text-gray-400 hover:text-gray-600 underline underline-offset-2"
-                      >Test notification</button>
-                    )}
+                    <button
+                      onClick={sendTestNotification}
+                      className="text-[10px] text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                    >Test notification</button>
                   </div>
                 </div>
 

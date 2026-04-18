@@ -19,8 +19,12 @@ export function useReminders({ meds = [], userId = null, journeyId = null, onSta
 
   // Sync whenever the browser permission changes (e.g. user revokes from settings)
   useEffect(() => {
-    setPermissionState(getPermission());
-  });
+    const interval = setInterval(() => {
+      const current = getPermission();
+      setPermissionState(prev => prev !== current ? current : prev);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── Register service worker ───────────────────────────────
   useEffect(() => {
@@ -29,11 +33,7 @@ export function useReminders({ meds = [], userId = null, journeyId = null, onSta
       .catch((err) => console.error('[MedCare SW] Registration failed:', err));
   }, []);
 
-  // ── Sync permissionState on mount ───────────────────────
-  // (No auto-request — Chrome silently denies requests not tied to a click)
-  useEffect(() => {
-    setPermissionState(getPermission());
-  }, []);
+  // permissionState is synced via interval above (no duplicate needed)
 
   // ── Schedule reminders via SW ─────────────────────────────
   const scheduleReminders = useCallback(() => {
@@ -140,55 +140,90 @@ export function useReminders({ meds = [], userId = null, journeyId = null, onSta
   const sendTestNotification = useCallback(async () => {
     console.log('[MedCare] Sending test notification. Permission:', Notification.permission);
     
+    // Step 1: Request permission if not granted
     if (Notification.permission !== 'granted') {
-      const result = await Notification.requestPermission();
-      console.log('[MedCare] Permission requested. Result:', result);
-      setPermissionState(result);
-      if (result !== 'granted') {
-        alert('Please allow notifications in your browser to enable reminders.');
+      try {
+        const result = await Notification.requestPermission();
+        console.log('[MedCare] Permission requested. Result:', result);
+        setPermissionState(result);
+        if (result !== 'granted') {
+          alert('Please allow notifications in your browser settings to enable reminders.\n\nChrome: Click the lock icon in the address bar → Site settings → Notifications → Allow');
+          return;
+        }
+      } catch (err) {
+        console.error('[MedCare] Permission request failed:', err);
+        alert('Could not request notification permission. Please enable it in browser settings.');
         return;
       }
     }
 
+    // Step 2: Check service worker support
     if (!('serviceWorker' in navigator)) {
-      alert('Service Worker not supported in this browser.');
+      // Fallback: use Notification API directly
+      try {
+        const medNames = meds.slice(0, 3).map(m => m.name || m.medicine_name || 'Medicine').join(', ');
+        new Notification('💊 MedCare Reminder Test', {
+          body: meds.length > 0
+            ? `You have medicines to take: ${medNames}`
+            : 'Your reminder system is working correctly!',
+          icon: '/favicon.svg',
+        });
+        console.log('[MedCare] Notification sent via Notification API fallback.');
+      } catch (e) {
+        console.error('[MedCare] Fallback notification failed:', e);
+      }
       return;
     }
 
+    // Step 3: Ensure service worker is registered and ready
     try {
+      // Re-register to make sure SW is active
+      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       const reg = await navigator.serviceWorker.ready;
+      
+      if (!reg.active) {
+        console.warn('[MedCare] SW not active yet, waiting...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
       const medNames = meds.slice(0, 3).map(m => m.name || m.medicine_name || 'Medicine').join(', ');
-      
-      await reg.showNotification('💊 MedCare Reminder Test', {
-        body: meds.length > 0
-          ? `You have medicines to take: ${medNames}`
-          : 'Your reminder system is working correctly!',
-        icon: '/favicon.svg',
-        badge: '/favicon.svg',
-        tag: 'medcare-test',
-        renotify: true,
-        requireInteraction: true,
-        data: { slotKey: 'test', medicines: meds.slice(0, 2) }
-      });
-      console.log('[MedCare] Notification sent via SW registration.');
-      
-      // Fallback for user: If they don't see the popup, show an alert after 1s
-      setTimeout(() => {
-        if (confirm('Did you see the notification popup? If not, your Windows "Focus Assist" or Chrome settings are blocking it. Click OK to see the "Missed Dose" logic in action.')) {
-          // Trigger the missed dose logic for them to see
-          const todayStr = new Date().toISOString().split('T')[0];
-          reg.active?.postMessage({
-            type: 'TEST_NOTIFICATION',
-            payload: { slotKey: `${todayStr}|morning`, label: 'Test', medicines: meds.slice(0, 1) }
-          });
-        }
-      }, 1500);
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // Send via SW message for full reminder experience (with action buttons)
+      if (reg.active) {
+        reg.active.postMessage({
+          type: 'TEST_NOTIFICATION',
+          payload: {
+            slotKey: `${todayStr}|test`,
+            label: 'Test',
+            medicines: meds.slice(0, 3).map(m => ({ name: m.name || m.medicine_name || 'Medicine' })),
+          }
+        });
+        console.log('[MedCare] Test notification sent via SW message.');
+      } else {
+        // Fallback: show directly via registration
+        await reg.showNotification('💊 MedCare Reminder Test', {
+          body: meds.length > 0
+            ? `You have medicines to take: ${medNames}`
+            : 'Your reminder system is working correctly!',
+          icon: '/favicon.svg',
+          badge: '/favicon.svg',
+          tag: 'medcare-test',
+          renotify: true,
+        });
+        console.log('[MedCare] Notification sent via SW registration fallback.');
+      }
     } catch (err) {
       console.error('[MedCare] Failed to show notification:', err);
-      // Last resort fallback
+      // Last resort fallback: direct Notification API
       try {
-        new Notification('MedCare Test (Fallback)');
-      } catch (e) {}
+        new Notification('💊 MedCare Reminder Test', {
+          body: 'Your reminder system is working correctly!',
+        });
+      } catch (e) {
+        console.error('[MedCare] All notification methods failed:', e);
+        alert('Notifications failed. Please check your browser settings.');
+      }
     }
   }, [meds]);
 
