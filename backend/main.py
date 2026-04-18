@@ -2,19 +2,28 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 import json
 import os
 import requests
 from fastapi import Query
 from ocr_service import process_prescription_image
+from medvision_routes import router as medvision_router, lifespan as medvision_lifespan
 
-app = FastAPI(title="MedCare OCR API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with medvision_lifespan(app):
+        yield
+
+app = FastAPI(title="MedCare API", version="2.0.0", lifespan=lifespan)
+app.include_router(medvision_router)
+
 
 # Allow the Vite dev server (port 5173) to call this API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

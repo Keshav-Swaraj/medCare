@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Inbox, Bell, Search, ChevronRight, Sun, Sunset, Moon, Upload, LogOut, FileText, Pill } from 'lucide-react';
+import { LayoutDashboard, Inbox, Bell, Search, ChevronRight, Sun, Sunset, Moon, Upload, LogOut, FileText, Pill, ScanLine, UserSearch } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useReminders, loadRecentLogs } from '../hooks/useReminders';
 
@@ -293,6 +293,12 @@ export default function AgentDashboard() {
               </button>
               <button onClick={() => navigate('/my-medicines')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
                 <div className="flex items-center gap-3"><Pill className="w-4 h-4" /> My Medicine</div>
+              </button>
+              <button onClick={() => navigate('/diagnostics')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
+                <div className="flex items-center gap-3"><ScanLine className="w-4 h-4" /> Diagnostics</div>
+              </button>
+              <button onClick={() => navigate('/search-doctor')} className="w-full flex items-center justify-between px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors">
+                <div className="flex items-center gap-3"><UserSearch className="w-4 h-4" /> Find Doctor</div>
               </button>
             </nav>
           </div>

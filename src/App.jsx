@@ -8,6 +8,10 @@ import AgentDashboard from './pages/AgentDashboard';
 import Chatbot from './pages/Chatbot';
 import MyMedicines from './pages/MyMedicines';
 import ProtectedRoute from './components/ProtectedRoute';
+import DiagnosticsUpload from './pages/DiagnosticsUpload';
+import DiagnosticsResult from './pages/DiagnosticsResult';
+import DiagnosticsChat from './pages/DiagnosticsChat';
+import DoctorSearch from './pages/DoctorSearch';
 
 function App() {
   return (
@@ -21,6 +25,10 @@ function App() {
         <Route path="/agent/:journeyId" element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
         <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
         <Route path="/my-medicines" element={<ProtectedRoute><MyMedicines /></ProtectedRoute>} />
+        <Route path="/diagnostics" element={<ProtectedRoute><DiagnosticsUpload /></ProtectedRoute>} />
+        <Route path="/diagnostics/results" element={<ProtectedRoute><DiagnosticsResult /></ProtectedRoute>} />
+        <Route path="/diagnostics/chat" element={<ProtectedRoute><DiagnosticsChat /></ProtectedRoute>} />
+        <Route path="/search-doctor" element={<ProtectedRoute><DoctorSearch /></ProtectedRoute>} />
       </Routes>
     </Router>
   );

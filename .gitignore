@@ -26,3 +26,13 @@ dist-ssr
 .env
 backend/.env
 *.env
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Deep Learning Models
+*.pth
+*.pt
+*.onnx
+*.h5
