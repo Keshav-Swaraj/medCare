@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RadialBarChart, RadialBar, ResponsiveContainer } from 'recharts';
-import { LayoutDashboard, Inbox, Bell, Search, ChevronRight, Sun, Sunset, Moon, Upload } from 'lucide-react';
+import { LayoutDashboard, Inbox, Bell, Search, ChevronRight, Sun, Sunset, Moon, Upload, LogOut, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useReminders, loadRecentLogs } from '../hooks/useReminders';
 
 const CHECKIN_KEY = 'medcare_checkins';
 const COLORS = ['sky', 'emerald', 'amber', 'violet', 'rose', 'indigo'];
@@ -63,7 +64,10 @@ export default function AgentDashboard() {
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const [userInitials, setUserInitials] = useState('U');
-  // Load checkins from localStorage
+  const [userId, setUserId] = useState(null);
+  const [journeyId, setJourneyId] = useState(null);
+  const [userMeta, setUserMeta] = useState({});
+  // checkins: { 'YYYY-MM-DD|medName|slot': 'taken'|'not_taken'|true }
   const [checkins, setCheckins] = useState(() => {
     try {
       const stored = localStorage.getItem(CHECKIN_KEY);
@@ -73,13 +77,37 @@ export default function AgentDashboard() {
   const [countdown, setCountdown] = useState('--:--:--');
   const [now, setNow] = useState(new Date());
 
-  // Fetch user + journeys
+  // Called by useReminders when SW sends feedback
+  const handleReminderStatus = useCallback((slotKey, status) => {
+    // slotKey from SW: 'YYYY-MM-DD|slot' → expand to per-med keys
+    setCheckins(prev => {
+      const updated = { ...prev };
+      // Mark all meds in that slot
+      const [dateStr, slot] = slotKey.split('|');
+      meds.filter(m => m[slot]).forEach(med => {
+        updated[`${dateStr}|${med.name}|${slot}`] = status;
+      });
+      localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, [meds]);
+
+  const { permissionGranted, permissionDenied, markTaken, markNotTaken, resetDose, sendTestNotification } = useReminders({
+    meds,
+    userId,
+    journeyId,
+    onStatusChange: handleReminderStatus,
+  });
+
+  // Fetch user + journeys + today's dose_logs
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
+      setUserId(user.id);
       const meta = user.user_metadata || {};
+      setUserMeta(meta);
       const fullName = meta.full_name || user.email?.split('@')[0] || 'User';
       setUserName(fullName.split(' ')[0]);
       setUserInitials(fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U');
@@ -91,12 +119,23 @@ export default function AgentDashboard() {
 
       if (data && !error) {
         setJourneys(data);
+        if (data[0]) setJourneyId(data[0].id);
         let all = [];
         data.forEach(j => { if (j.extracted_data) all = [...all, ...j.extracted_data]; });
         const unique = Array.from(
           new Map(all.map(m => [m.medicine_name || m.name, m])).values()
         ).map(m => ({ ...m, name: m.medicine_name || m.name }));
         setMeds(unique);
+
+        // Hydrate checkins from Supabase dose_logs (overrides localStorage)
+        const dbLogs = await loadRecentLogs(user.id, 7);
+        if (Object.keys(dbLogs).length > 0) {
+          setCheckins(prev => {
+            const merged = { ...prev, ...dbLogs };
+            localStorage.setItem(CHECKIN_KEY, JSON.stringify(merged));
+            return merged;
+          });
+        }
       }
       setLoading(false);
     })();
@@ -118,15 +157,47 @@ export default function AgentDashboard() {
   }, [meds]);
 
   const toggleCheckin = useCallback((medName, slot) => {
-    const key = `${now.toISOString().split('T')[0]}|${medName}|${slot}`;
+    const dateStr = now.toISOString().split('T')[0];
+    const key = `${dateStr}|${medName}|${slot}`;
+    const currentStatus = checkins[key];
+
+    // Cycle: Pending (none/false) -> taken -> not_taken -> Pending
+    let newStatus;
+    if (currentStatus === 'taken' || currentStatus === true) {
+      newStatus = 'not_taken';
+    } else if (currentStatus === 'not_taken') {
+      newStatus = false;
+    } else {
+      newStatus = 'taken';
+    }
+
     setCheckins(prev => {
-      const updated = { ...prev, [key]: !prev[key] };
+      const updated = { ...prev, [key]: newStatus };
       localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated));
       return updated;
     });
-  }, [now]);
+
+    // Persist to Supabase
+    if (newStatus === 'taken') {
+      markTaken(medName, slot, dateStr);
+    } else if (newStatus === 'not_taken') {
+      markNotTaken(medName, slot, dateStr);
+    } else {
+      resetDose(medName, slot, dateStr);
+    }
+  }, [now, checkins, markTaken, markNotTaken, resetDose]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
 
   // Derived
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
   const todayStr = now.toISOString().split('T')[0];
   const firstJourney = journeys[0];
   const journeyDay = firstJourney
@@ -147,7 +218,7 @@ export default function AgentDashboard() {
     ...buildKeys(eveningMeds, 'evening'),
   ];
   const todayTotal = allTodayKeys.length;
-  const todayChecked = allTodayKeys.filter(k => checkins[k]).length;
+  const todayChecked = allTodayKeys.filter(k => checkins[k] === 'taken' || checkins[k] === true).length;
   const todayPct = todayTotal > 0 ? Math.round((todayChecked / todayTotal) * 100) : 0;
 
   // Weekly bar data (last 5 days)
@@ -161,7 +232,7 @@ export default function AgentDashboard() {
       if (m.evening) acc.push(`${dStr}|${m.name}|evening`);
       return acc;
     }, []);
-    const taken = slots.filter(k => checkins[k]).length;
+    const taken = slots.filter(k => checkins[k] === 'taken' || checkins[k] === true).length;
     const pct = slots.length > 0 ? Math.round((taken / slots.length) * 100) : 0;
     return {
       day: d.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -192,14 +263,13 @@ export default function AgentDashboard() {
     if (meds.some(m => m.evening) && h < 20) return '8:00 PM — Evening Dose';
     return '8:00 AM — Tomorrow Morning';
   };
-
   const noData = !loading && meds.length === 0;
 
   return (
     <div className="flex h-screen bg-[#f8fafc] font-sans overflow-hidden">
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shrink-0">
+      <aside className="no-print w-64 bg-white border-r border-gray-100 flex flex-col shrink-0">
         <div className="p-6 flex items-center gap-2">
           <div className="grid grid-cols-2 gap-[3px] p-1.5 rounded-lg border border-gray-100">
             <div className="w-2 h-2 rounded-full bg-amber-500" />
@@ -244,11 +314,17 @@ export default function AgentDashboard() {
               </nav>
             </div>
           )}
+
+          <div className="pt-4 mt-4 border-t border-gray-100">
+            <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500 hover:bg-rose-50 rounded-xl font-medium text-sm transition-colors">
+              <LogOut className="w-4 h-4" /> Log Out
+            </button>
+          </div>
         </div>
       </aside>
 
       {/* Main */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <main className="no-print flex-1 flex flex-col min-w-0 overflow-y-auto">
         <header className="px-8 py-5 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-sm z-10 border-b border-gray-100">
           <div className="flex items-center gap-2 text-gray-500 text-sm font-medium">
             <CalendarIcon />
@@ -258,7 +334,15 @@ export default function AgentDashboard() {
               <span className="text-gray-900 font-semibold">Journey Day {journeyDay}</span>
             </>)}
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm hover:shadow-md"
+            >
+              <FileText className="w-4 h-4 text-sky-500" />
+              Download PDF Report
+            </button>
+            <div className="h-6 w-px bg-gray-100 mx-1" />
             <button className="text-gray-400 hover:text-gray-600"><Search className="w-5 h-5" /></button>
             <button className="text-gray-400 hover:text-gray-600"><Bell className="w-5 h-5" /></button>
             <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm border border-emerald-200">{userInitials}</div>
@@ -313,15 +397,27 @@ export default function AgentDashboard() {
                     <div className="space-y-2.5">
                       {list.map((med, idx) => {
                         const key = `${todayStr}|${med.name}|${slot}`;
-                        const done = !!checkins[key];
+                        const status = checkins[key];
+                        const isTaken = status === 'taken' || status === true;
+                        const isNotTaken = status === 'not_taken';
                         return (
                           <label key={idx} onClick={() => toggleCheckin(med.name, slot)} className="flex items-center gap-3 cursor-pointer group p-2.5 rounded-xl hover:bg-gray-50 transition-colors">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 group-hover:border-sky-400'}`}>
-                              {done && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              isTaken ? 'bg-emerald-500 border-emerald-500' :
+                              isNotTaken ? 'bg-rose-400 border-rose-400' :
+                              'border-gray-300 group-hover:border-sky-400'
+                            }`}>
+                              {isTaken && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                              {isNotTaken && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-medium truncate transition-colors ${done ? 'line-through text-gray-400' : 'text-gray-800 group-hover:text-gray-900'}`}>
+                              <p className={`text-sm font-medium truncate transition-colors ${
+                                isTaken ? 'line-through text-gray-400' :
+                                isNotTaken ? 'text-rose-400' :
+                                'text-gray-800 group-hover:text-gray-900'
+                              }`}>
                                 {med.name}
+                                {isNotTaken && <span className="ml-2 text-[10px] font-bold bg-rose-50 text-rose-400 px-1.5 py-0.5 rounded-full">Missed</span>}
                               </p>
                               <p className="text-xs text-gray-400">{med.frequency || time}</p>
                             </div>
@@ -339,6 +435,34 @@ export default function AgentDashboard() {
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Next Dose In</p>
                   <h3 className="text-4xl font-bold text-gray-900 tracking-tight font-mono mb-1">{countdown}</h3>
                   <p className="text-xs text-gray-400 font-medium">{nextDoseLabel()}</p>
+                  <div className="mt-3 flex flex-col items-center gap-2">
+                    {permissionGranted ? (
+                      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                        Reminders Active
+                      </span>
+                    ) : permissionDenied ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[10px] font-semibold text-rose-500 bg-rose-50 px-3 py-1 rounded-full">
+                          🚫 Notifications Blocked
+                        </span>
+                        <p className="text-[9px] text-gray-400 max-w-[150px]">Please reset permission in browser settings to enable reminders.</p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={sendTestNotification}
+                        className="text-[11px] font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-full transition-colors"
+                      >
+                        🔔 Enable Reminders
+                      </button>
+                    )}
+                    {permissionGranted && (
+                      <button
+                        onClick={sendTestNotification}
+                        className="text-[10px] text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                      >Test notification</button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="bg-white rounded-[1.5rem] p-6 shadow-[0_4px_20px_rgb(0,0,0,0.04)] border border-gray-100 flex-1 flex flex-col">
@@ -429,6 +553,164 @@ export default function AgentDashboard() {
           )}
         </div>
       </main>
+
+      {/* Hidden Printable Report Section */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media screen {
+          .print-report-container { display: none; }
+        }
+        @media print {
+          /* Hide EVERYTHING by default */
+          body, html {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          
+          .no-print, aside, main, header, nav, button {
+            display: none !important;
+          }
+
+          /* Specifically show the report */
+          .print-report-container {
+            display: block !important;
+            visibility: visible !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 40px !important;
+            background: white !important;
+            z-index: 9999 !important;
+          }
+
+          .print-report-container * {
+            visibility: visible !important;
+          }
+
+          /* Fix for tables and colors in print */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}} />
+      
+      <div id="printable-report" className="print-report-container">
+        <div className="flex justify-between items-start border-b-2 border-sky-500 pb-8 mb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="grid grid-cols-2 gap-[2px] p-1 rounded-md bg-sky-500">
+                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
+                <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
+                <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
+              </div>
+              <span className="font-bold text-2xl text-gray-900">MedCare</span>
+            </div>
+            <p className="text-gray-500 text-sm">Personal Health Adherence Report</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-bold text-gray-900">Date: {now.toLocaleDateString()}</p>
+            <p className="text-xs text-gray-500">Ref: MC-{Math.random().toString(36).substring(7).toUpperCase()}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-8 mb-10">
+          <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+            <h3 className="text-xs font-bold text-sky-600 uppercase tracking-widest mb-4">Patient Information</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between border-b border-gray-200 pb-2">
+                <span className="text-gray-500 text-sm">Full Name</span>
+                <span className="text-gray-900 text-sm font-semibold">{userMeta.full_name || userName}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-2">
+                <span className="text-gray-500 text-sm">Age / Gender</span>
+                <span className="text-gray-900 text-sm font-semibold">{userMeta.age || 'N/A'} • {userMeta.gender || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 text-sm block mb-1">Pre-existing Conditions</span>
+                <span className="text-gray-900 text-sm font-medium">{userMeta.conditions || 'None recorded'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 text-sm block mb-1">Known Allergies</span>
+                <span className="text-gray-900 text-sm font-medium text-rose-500">{userMeta.allergies || 'None recorded'}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-sky-50 p-6 rounded-2xl border border-sky-100">
+            <h3 className="text-xs font-bold text-sky-600 uppercase tracking-widest mb-4">Adherence Summary</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white p-4 rounded-xl text-center shadow-sm">
+                <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Today</p>
+                <p className="text-2xl font-bold text-sky-600">{todayPct}%</p>
+              </div>
+              <div className="bg-white p-4 rounded-xl text-center shadow-sm">
+                <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Weekly Avg</p>
+                <p className="text-2xl font-bold text-emerald-500">{weeklyAvg}%</p>
+              </div>
+              <div className="bg-white p-4 rounded-xl text-center shadow-sm col-span-2">
+                <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Journey Progress</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-400" style={{ width: `${journeyPct}%` }} />
+                  </div>
+                  <span className="text-sm font-bold text-gray-700">Day {journeyDay}/{journeyDuration}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-10">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Current Medication Schedule</h3>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100 text-left">
+                <th className="p-3 text-xs font-bold text-gray-600 rounded-tl-xl">Medicine Name</th>
+                <th className="p-3 text-xs font-bold text-gray-600">Timing / Frequency</th>
+                <th className="p-3 text-xs font-bold text-gray-600">Duration</th>
+                <th className="p-3 text-xs font-bold text-gray-600 rounded-tr-xl">Course Progress</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {meds.map((med, i) => (
+                <tr key={i}>
+                  <td className="p-3 py-4 text-sm font-semibold text-gray-900">{med.name}</td>
+                  <td className="p-3 py-4 text-sm text-gray-600">
+                    {[med.morning && 'Morning', med.afternoon && 'Afternoon', med.evening && 'Evening'].filter(Boolean).join(', ') || med.frequency}
+                  </td>
+                  <td className="p-3 py-4 text-sm text-gray-600">{med.duration}</td>
+                  <td className="p-3 py-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-sky-400" style={{ width: `${getMedProgress(med)}%` }} />
+                      </div>
+                      <span className="text-xs font-bold text-gray-400">{getMedProgress(med)}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-16 pt-8 border-t border-gray-100 flex justify-between items-end">
+          <div className="max-w-md">
+            <p className="text-[10px] text-gray-400 font-bold uppercase mb-2">Medical Disclaimer</p>
+            <p className="text-[9px] text-gray-400 leading-relaxed">
+              This report is generated by MedCare AI Agent based on user-inputted data and is intended for informational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold text-gray-900 uppercase">MedCare Health System</p>
+            <p className="text-[9px] text-gray-400">medcare-agent.ai • Support: hello@medcare.ai</p>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }
