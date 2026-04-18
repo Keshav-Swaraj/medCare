@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Inbox, Bell, Search, ChevronRight, Sun, Sunset, Moon, Upload, LogOut, FileText, Pill, ScanLine, UserSearch } from 'lucide-react';
+import { LayoutDashboard, Inbox, Bell, Search, ChevronRight, Sun, Sunset, Moon, Upload, LogOut, FileText, Pill, ScanLine, UserSearch, Share2, Copy, X, Check, Trash2, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useReminders, loadRecentLogs } from '../hooks/useReminders';
 import Sidebar from '../components/Sidebar';
@@ -76,6 +76,15 @@ export default function AgentDashboard() {
   });
   const [countdown, setCountdown] = useState('--:--:--');
   const [now, setNow] = useState(new Date());
+
+  // Share Journey state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareCode, setShareCode] = useState(null);
+  const [shareLink, setShareLink] = useState(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const API_URL = import.meta.env.VITE_OCR_API_URL || 'http://localhost:8000';
 
   // Called by useReminders when SW sends feedback
   const handleReminderStatus = useCallback((slotKey, status) => {
@@ -191,6 +200,61 @@ export default function AgentDashboard() {
     window.print();
   };
 
+  // Share Journey handlers
+  const handleGenerateShareCode = async () => {
+    setShareLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const resp = await fetch(`${API_URL}/api/v1/share/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ expires_in_days: 7 }),
+      });
+      if (!resp.ok) throw new Error('Failed to generate share code');
+      const result = await resp.json();
+      setShareCode(result.share_code);
+      setShareLink(`${window.location.origin}${result.share_link}`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const handleRevokeShareCode = async () => {
+    if (!shareCode) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`${API_URL}/api/v1/share/${shareCode}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+      setShareCode(null);
+      setShareLink(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!shareLink) return;
+    navigator.clipboard.writeText(shareLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyCode = () => {
+    if (!shareCode) return;
+    navigator.clipboard.writeText(shareCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
 
   // Derived
 
@@ -279,6 +343,13 @@ export default function AgentDashboard() {
             >
               <FileText className="w-4 h-4 text-sky-500" />
               Download PDF Report
+            </button>
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 border border-sky-500 rounded-xl text-sm font-semibold text-white transition-all shadow-sm hover:shadow-md shadow-sky-500/20"
+            >
+              <Share2 className="w-4 h-4" />
+              Share Journey
             </button>
             <div className="h-6 w-px bg-gray-100 mx-1" />
             <button className="text-gray-400 hover:text-gray-600"><Search className="w-5 h-5" /></button>
@@ -655,6 +726,95 @@ export default function AgentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setShowShareModal(false)}>
+          <div className="bg-white rounded-[2rem] shadow-2xl border border-gray-100 w-full max-w-md mx-4 p-8" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-sky-50 rounded-xl flex items-center justify-center">
+                  <Users className="w-5 h-5 text-sky-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Share My Journey</h3>
+                  <p className="text-xs text-gray-400">Let a caregiver or doctor view your progress</p>
+                </div>
+              </div>
+              <button onClick={() => setShowShareModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!shareCode ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-500 mb-6">Generate a secure share code that gives read-only access to your medication journey for 7 days.</p>
+                <button
+                  onClick={handleGenerateShareCode}
+                  disabled={shareLoading}
+                  className="w-full bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-semibold py-3 px-6 rounded-2xl shadow-lg shadow-sky-500/30 transition-all hover:scale-[1.01] disabled:scale-100 flex items-center justify-center gap-2"
+                >
+                  {shareLoading ? (
+                    <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Generating...</>
+                  ) : (
+                    <><Share2 className="w-4 h-4" /> Generate Share Code</>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Share Code */}
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Share Code</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-lg font-bold text-gray-900 tracking-widest text-center">
+                      {shareCode}
+                    </div>
+                    <button
+                      onClick={handleCopyCode}
+                      className={`p-3 rounded-xl border transition-all ${
+                        copiedCode ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {copiedCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Share Link */}
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Share Link</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 truncate">
+                      {shareLink}
+                    </div>
+                    <button
+                      onClick={handleCopyLink}
+                      className={`p-3 rounded-xl border transition-all ${
+                        copied ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700">
+                  ⏳ This link expires in 7 days. The caregiver will see a read-only view of your schedule, adherence, and progress.
+                </div>
+
+                {/* Revoke */}
+                <button
+                  onClick={handleRevokeShareCode}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-rose-200 text-sm font-semibold text-rose-500 hover:bg-rose-50 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" /> Revoke Access
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );

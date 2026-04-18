@@ -12,6 +12,7 @@ import DiagnosticsUpload from './pages/DiagnosticsUpload';
 import DiagnosticsResult from './pages/DiagnosticsResult';
 import DiagnosticsChat from './pages/DiagnosticsChat';
 import DoctorSearch from './pages/DoctorSearch';
+import SharedJourney from './pages/SharedJourney';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         <Route path="/diagnostics/results" element={<ProtectedRoute><DiagnosticsResult /></ProtectedRoute>} />
         <Route path="/diagnostics/chat" element={<ProtectedRoute><DiagnosticsChat /></ProtectedRoute>} />
         <Route path="/search-doctor" element={<ProtectedRoute><DoctorSearch /></ProtectedRoute>} />
+        <Route path="/shared/journey/:code" element={<SharedJourney />} />
       </Routes>
     </Router>
   );
