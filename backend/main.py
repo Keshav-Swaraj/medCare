@@ -173,16 +173,6 @@ def search_medicine(q: str = Query(..., description="Medicine name to search")):
                     "buyLink": f"https://www.apollopharmacy.in/search-medicines/{safe_q}"
                 })
                 
-                # Simulated Truemeds (usually 15-20% discount)
-                truemeds_sale = round(mrp * 0.82, 2)
-                results.append({
-                    "source": "Truemeds",
-                    "medicineName": name,
-                    "brandedPrice": mrp,
-                    "janAushadhiPrice": truemeds_sale,
-                    "savings": max(0, round(mrp - truemeds_sale, 2)),
-                    "buyLink": f"https://www.truemeds.in/search?q={safe_q}"
-                })
 
         # Sort results by janAushadhiPrice (cheapest first)
         results = sorted(results, key=lambda x: x["janAushadhiPrice"])
