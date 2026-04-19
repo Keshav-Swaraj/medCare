@@ -7,7 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
 *.local
@@ -16,23 +19,44 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
+# Environment variables
 .env
-backend/.env
 *.env
+backend/.env
 
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
+.venv/
+backend/.venv/
+venv/
+env/
+*.egg-info/
 
 # Deep Learning Models
+*.pth
+*.pth.tar
+*.pt
 # *.pth
 # *.pt
 *.onnx
 *.h5
+*.safetensors
+backend/model_assests/**/*.pth
+backend/model_assests/**/*.pt
+backend/model_assests/**/*.pth.tar
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Supabase
+supabase/.temp/

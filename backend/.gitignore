@@ -1,0 +1,33 @@
+# Environment variables
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+*.dist-info/
+
+# Deep Learning Models
+model_assests/**/*.pth
+model_assests/**/*.pth.tar
+model_assests/**/*.pt
+model_assests/**/*.h5
+model_assests/**/*.onnx
+model_assests/**/*.safetensors
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/

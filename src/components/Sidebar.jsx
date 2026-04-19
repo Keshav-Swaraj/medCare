@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Inbox, Pill, ScanLine, UserSearch, LogOut } from 'lucide-react';
+import { LayoutDashboard, Inbox, Pill, ScanLine, UserSearch, LogOut, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function Sidebar({ activeTab }) {
@@ -67,6 +67,8 @@ export default function Sidebar({ activeTab }) {
           </nav>
         </div>
 
+        <CaregiverCodeEntry navigate={navigate} />
+
         <div className="pt-4 mt-4 border-t border-gray-100">
           <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500 hover:bg-rose-50 rounded-xl font-medium text-sm transition-colors">
             <LogOut className="w-4 h-4" /> Log Out
@@ -74,5 +76,57 @@ export default function Sidebar({ activeTab }) {
         </div>
       </div>
     </aside>
+  );
+}
+
+function CaregiverCodeEntry({ navigate }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState('');
+
+  const handleGo = (e) => {
+    e.preventDefault();
+    const c = code.trim().toUpperCase();
+    if (!c) return;
+    navigate(`/shared/journey/${c}`);
+  };
+
+  return (
+    <div className="pt-4 mt-4 border-t border-gray-100">
+      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">Sharing</p>
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl font-medium text-sm transition-colors"
+        >
+          <Users className="w-4 h-4" /> Caregiver View
+        </button>
+      ) : (
+        <form onSubmit={handleGo} className="px-3 space-y-2">
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="Enter code"
+            autoFocus
+            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono font-semibold text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400 tracking-wider text-center uppercase"
+          />
+          <div className="flex gap-1.5">
+            <button
+              type="submit"
+              className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-1.5 rounded-lg text-xs transition-colors"
+            >
+              View
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOpen(false); setCode(''); }}
+              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-500 font-semibold rounded-lg text-xs transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }

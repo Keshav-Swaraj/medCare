@@ -7,7 +7,7 @@ from models.xray_model import load_chexnet_model, predict_xray
 
 # Resolve project root and weight path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_WEIGHT_PATH = PROJECT_ROOT / 'model_assests' / 'xray' / 'xray.pth'
+DEFAULT_WEIGHT_PATH = PROJECT_ROOT / 'model_assests' / 'xray' / 'xray.pth.tar'
 
 _xray_model = None
 

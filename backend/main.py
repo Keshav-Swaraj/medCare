@@ -9,6 +9,7 @@ import requests
 from fastapi import Query
 from ocr_service import process_prescription_image
 from medvision_routes import router as medvision_router, lifespan as medvision_lifespan
+from sharing_routes import router as sharing_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MedCare API", version="2.0.0", lifespan=lifespan)
 app.include_router(medvision_router)
+app.include_router(sharing_router)
 
 
 # Allow the Vite dev server (port 5173) to call this API
