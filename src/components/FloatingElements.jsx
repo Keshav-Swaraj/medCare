@@ -79,7 +79,7 @@ function FloatingElements({ activeIndex }) {
           rotate: activeIndex === 3 ? 0 : -3,
           zIndex: activeIndex === 3 ? 40 : 20,
         }}
-        style={{ bottom: '5%', left: '8%', transformOrigin: 'bottom left' }}
+        style={{ bottom: '8%', left: '8%', transformOrigin: 'bottom left' }}
         transition={springConfig}
         className={`absolute w-72 bg-white/95 backdrop-blur p-5 rounded-3xl border border-gray-100 transition-shadow duration-300 ${activeIndex === 3 ? 'shadow-[0_30px_60px_rgb(0,0,0,0.15)]' : 'shadow-[0_20px_50px_rgb(0,0,0,0.08)]'}`}
       >
@@ -128,7 +128,7 @@ function FloatingElements({ activeIndex }) {
           rotate: activeIndex === 4 ? 0 : 2,
           zIndex: activeIndex === 4 ? 40 : 20,
         }}
-        style={{ bottom: '8%', right: '12%', transformOrigin: 'bottom right' }}
+        style={{ bottom: '10%', right: '12%', transformOrigin: 'bottom right' }}
         transition={springConfig}
         className={`absolute w-72 bg-white/95 backdrop-blur p-5 rounded-3xl border border-gray-100 transition-shadow duration-300 ${activeIndex === 4 ? 'shadow-[0_30px_60px_rgb(0,0,0,0.15)]' : 'shadow-[0_20px_50px_rgb(0,0,0,0.08)]'}`}
       >

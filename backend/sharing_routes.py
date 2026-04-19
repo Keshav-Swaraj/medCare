@@ -307,12 +307,11 @@ async def generate_share_code(
     expires_at = (datetime.now(timezone.utc) + timedelta(days=body.expires_in_days)).isoformat()
 
     # Insert into shared_access via Supabase REST
-    # Use service role key to bypass RLS (auth already validated via JWT decode)
-    svc_auth = f"Bearer {SUPABASE_SERVICE_KEY}"
+    # Forward the user's JWT authorization so Supabase RLS evaluates auth.uid() correctly
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             f"{SUPABASE_URL}/rest/v1/shared_access",
-            headers={**SUPABASE_HEADERS, "Authorization": svc_auth, "Prefer": "return=representation"},
+            headers={**SUPABASE_HEADERS, "Authorization": authorization, "Prefer": "return=representation"},
             json={
                 "owner_id": user_id,
                 "share_code": share_code,
@@ -321,8 +320,14 @@ async def generate_share_code(
             },
         )
     if resp.status_code not in (200, 201):
-        print(f"[SHARE] Insert failed ({resp.status_code}): {resp.text[:300]}")
-        raise HTTPException(status_code=500, detail=f"Failed to create share code: {resp.text}")
+        err_body = resp.text[:500]
+        print(f"[SHARE] Insert failed ({resp.status_code}): {err_body}")
+        if resp.status_code == 404 or "relation" in err_body.lower() or "does not exist" in err_body.lower():
+            raise HTTPException(
+                status_code=500,
+                detail="The 'shared_access' table does not exist in Supabase. Please create it — see the README for the SQL."
+            )
+        raise HTTPException(status_code=500, detail=f"Failed to create share code: {err_body}")
 
     return GenerateResponse(
         share_code=share_code,
@@ -402,7 +407,7 @@ async def revoke_share_code(
     async with httpx.AsyncClient() as client:
         resp = await client.delete(
             f"{SUPABASE_URL}/rest/v1/shared_access?share_code=eq.{share_code}&owner_id=eq.{user_id}",
-            headers={**SUPABASE_HEADERS, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"},
+            headers={**SUPABASE_HEADERS, "Authorization": authorization},
         )
     if resp.status_code not in (200, 204):
         raise HTTPException(status_code=404, detail="Share code not found or not owned by you.")

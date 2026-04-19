@@ -17,11 +17,8 @@ async def lifespan(app: FastAPI):
         yield
 
 app = FastAPI(title="MedCare API", version="2.0.0", lifespan=lifespan)
-app.include_router(medvision_router)
-app.include_router(sharing_router)
 
-
-# Allow the Vite dev server (port 5173) to call this API
+# CORS must be added BEFORE routers so headers are present on all responses, including errors
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,6 +26,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(medvision_router)
+app.include_router(sharing_router)
 
 
 @app.get("/")

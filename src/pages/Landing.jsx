@@ -5,7 +5,7 @@ import Hero from '../components/Hero';
 
 function Landing() {
   const [activeIndex, setActiveIndex] = useState(0);
-  const totalStages = 5; // 0, 1, 2, 3, 4, 5 (6 total states)
+  const totalStages = 6; // 0, 1, 2, 3, 4, 5, 6 (7 total states)
   const isCoolingDown = useRef(false); // hard lock: blocks ALL events during cooldown
 
   useEffect(() => {

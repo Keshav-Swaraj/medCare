@@ -20,10 +20,10 @@ function Hero({ activeIndex }) {
   };
 
   return (
-    <main className="flex-1 w-full flex flex-col items-center justify-center relative pt-20 pb-32 px-4 z-10">
+    <main className="flex-1 w-full flex flex-col items-center justify-center relative pt-8 pb-16 px-4 z-10">
       
       {/* Central Floating Icon */}
-      <div className="mb-8 z-20 group">
+      <div className="mb-4 z-20 group">
         <div className="grid grid-cols-2 gap-1.5 bg-white p-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 transform -rotate-3 transition-all duration-500 group-hover:rotate-[177deg] group-hover:scale-110">
           <div className="w-4 h-4 rounded-full bg-brandBlue transition-transform duration-300 group-hover:scale-110"></div>
           <div className="w-4 h-4 rounded-full bg-gray-800 transition-transform duration-300 group-hover:scale-110"></div>
@@ -32,20 +32,20 @@ function Hero({ activeIndex }) {
         </div>
       </div>
 
-      <h1 className="relative z-30 text-5xl sm:text-6xl md:text-7xl font-semibold tracking-tight text-center max-w-4xl leading-[1.1] mb-6">
+      <h1 className="relative z-30 text-5xl sm:text-6xl md:text-7xl font-semibold tracking-tight text-center max-w-4xl leading-[1.1] mb-4">
         <span className="text-gray-900">Your autonomous health companion</span><br className="hidden sm:block" />
         <span className="text-gray-400">after every doctor visit.</span>
       </h1>
       
-      <p className="relative z-30 text-lg md:text-xl text-gray-500 text-center max-w-3xl mb-10 font-medium">
+      <p className="relative z-30 text-lg md:text-xl text-gray-500 text-center max-w-3xl mb-6 font-medium">
         Understand your prescription, scans, and reports in simple words. Get a clear medicine schedule, smart reminders, progress tracking, plain-language explanations, and AI support.
       </p>
       
       <motion.div
         initial={false}
         animate={{
-          scale: activeIndex === 5 ? 1.4 : 1,
-          zIndex: activeIndex === 5 ? 50 : 30,
+          scale: activeIndex === 6 ? 1.4 : 1,
+          zIndex: activeIndex === 6 ? 50 : 30,
         }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
         className="relative z-30"
@@ -56,8 +56,16 @@ function Hero({ activeIndex }) {
       </motion.div>
 
       {/* Caregiver Code Entry */}
-      <div className="z-20 mt-12 w-full max-w-sm">
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-[0_8px_30px_rgb(0,0,0,0.06)] p-6">
+      <motion.div 
+        initial={false}
+        animate={{
+          scale: activeIndex === 5 ? 1.15 : 1,
+          zIndex: activeIndex === 5 ? 50 : 20,
+        }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="z-20 mt-8 w-full max-w-sm"
+      >
+        <div className={`bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200 p-6 transition-shadow duration-300 ${activeIndex === 5 ? 'shadow-[0_30px_60px_rgb(0,0,0,0.15)]' : 'shadow-[0_8px_30px_rgb(0,0,0,0.06)]'}`}>
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 bg-sky-50 rounded-lg flex items-center justify-center">
               <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -86,7 +94,7 @@ function Hero({ activeIndex }) {
           </form>
           {codeError && <p className="text-xs text-rose-500 mt-2 text-center">{codeError}</p>}
         </div>
-      </div>
+      </motion.div>
 
       <FloatingElements activeIndex={activeIndex} />
       

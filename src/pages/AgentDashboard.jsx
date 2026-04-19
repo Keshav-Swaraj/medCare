@@ -82,6 +82,7 @@ export default function AgentDashboard() {
   const [shareCode, setShareCode] = useState(null);
   const [shareLink, setShareLink] = useState(null);
   const [shareLoading, setShareLoading] = useState(false);
+  const [shareError, setShareError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const API_URL = import.meta.env.VITE_OCR_API_URL || 'http://localhost:8000';
@@ -258,6 +259,7 @@ export default function AgentDashboard() {
   // Share Journey handlers
   const handleGenerateShareCode = async () => {
     setShareLoading(true);
+    setShareError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -269,12 +271,20 @@ export default function AgentDashboard() {
         },
         body: JSON.stringify({ expires_in_days: 7 }),
       });
-      if (!resp.ok) throw new Error('Failed to generate share code');
+      if (!resp.ok) {
+        let errMessage = 'Failed to generate share code';
+        try {
+          const errData = await resp.json();
+          errMessage = errData.detail || errMessage;
+        } catch(e) {}
+        throw new Error(errMessage);
+      }
       const result = await resp.json();
       setShareCode(result.share_code);
       setShareLink(`${window.location.origin}${result.share_link}`);
     } catch (err) {
       console.error(err);
+      setShareError(err.message);
     } finally {
       setShareLoading(false);
     }
@@ -373,8 +383,7 @@ export default function AgentDashboard() {
 
   const getMedProgress = (med) => {
     if (!firstJourney) return 0;
-    const days = Math.floor((now - new Date(firstJourney.created_at)) / 86400000);
-    return Math.min(100, Math.round((days / parseDays(med.duration)) * 100));
+    return Math.min(100, Math.round((journeyDay / parseDays(med.duration)) * 100));
   };
 
   const nextDoseLabel = () => {
@@ -412,7 +421,7 @@ export default function AgentDashboard() {
               Download PDF Report
             </button>
             <button
-              onClick={() => setShowShareModal(true)}
+              onClick={() => { setShowShareModal(true); setShareError(null); }}
               className="flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 border border-sky-500 rounded-xl text-sm font-semibold text-white transition-all shadow-sm hover:shadow-md shadow-sky-500/20"
             >
               <Share2 className="w-4 h-4" />
@@ -827,6 +836,11 @@ export default function AgentDashboard() {
             {!shareCode ? (
               <div className="text-center py-4">
                 <p className="text-sm text-gray-500 mb-6">Generate a secure share code that gives read-only access to your medication journey for 7 days.</p>
+                {shareError && (
+                  <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-medium rounded-xl p-3 mb-4 text-left">
+                    {shareError}
+                  </div>
+                )}
                 <button
                   onClick={handleGenerateShareCode}
                   disabled={shareLoading}
