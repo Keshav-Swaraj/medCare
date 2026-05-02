@@ -1,0 +1,5 @@
+# Exclude Python backend — deployed separately on Railway
+backend/
+*.py
+*.pth
+*.pt
