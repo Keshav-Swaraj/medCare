@@ -5,7 +5,7 @@ import shutil
 from contextlib import asynccontextmanager
 import os
 import base64
-from services.xray_service import process_xray, init_xray_model
+# ML imports handled below (conditional on torch availability)
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, Query
@@ -17,22 +17,36 @@ import re
 import json
 import difflib
 import numpy as np
-import nibabel as nib # type: ignore
 from PIL import Image
-from nibabel.loadsave import load # type: ignore
 from geopy.geocoders import Nominatim
-
-
 
 # Load environment variables
 load_dotenv()
 
-# Import your ML model functions for each modality
-from services.xray_service import process_xray, init_xray_model
-# Uncomment when available:
-from services.ct_service import process_ct, init_ct_models
-from services.ultrasound_service import process_ultrasound, init_ultrasound_model
-from services.mri_service import process_mri, init_mri_models
+# ML imports are optional — gracefully disabled on lite deployments (no torch)
+try:
+    import nibabel as nib  # type: ignore
+    from nibabel.loadsave import load  # type: ignore
+    from services.xray_service import process_xray, init_xray_model
+    from services.ct_service import process_ct, init_ct_models
+    from services.ultrasound_service import process_ultrasound, init_ultrasound_model
+    from services.mri_service import process_mri, init_mri_models
+    ML_AVAILABLE = True
+    print("[STARTUP] ML (torch) dependencies loaded.")
+except ImportError as _e:
+    print(f"[STARTUP] ML dependencies not installed ({_e}). Inference routes will return 503.")
+    ML_AVAILABLE = False
+    nib = None  # type: ignore
+    load = None  # type: ignore
+    def process_xray(*a, **kw): pass
+    def init_xray_model(*a, **kw): pass
+    def process_ct(*a, **kw): pass
+    def init_ct_models(*a, **kw): pass
+    def process_ultrasound(*a, **kw): pass
+    def init_ultrasound_model(*a, **kw): pass
+    def process_mri(*a, **kw): pass
+    def init_mri_models(*a, **kw): pass
+
 from services.gatekeeper_service import validate_modality, format_mismatch_message
 
 # Initialize Groq Client
@@ -51,16 +65,17 @@ def has_volume_extension(filename: str) -> bool:
 # Startup: initialize all models (failures are non-fatal – model may be unavailable)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    for name, init_fn in [
-        ("X-ray", init_xray_model),
-        ("CT", init_ct_models),
-        ("Ultrasound", init_ultrasound_model),
-        ("MRI", init_mri_models),
-    ]:
-        try:
-            init_fn()
-        except Exception as exc:
-            print(f"[STARTUP] Warning: {name} model could not be loaded: {exc}")
+    if ML_AVAILABLE:
+        for name, init_fn in [
+            ("X-ray", init_xray_model),
+            ("CT", init_ct_models),
+            ("Ultrasound", init_ultrasound_model),
+            ("MRI", init_mri_models),
+        ]:
+            try:
+                init_fn()
+            except Exception as exc:
+                print(f"[STARTUP] Warning: {name} model could not be loaded: {exc}")
     yield
     print("Shutting down models...")
 
@@ -350,6 +365,8 @@ def generate_medical_report(symptoms: List[str], image_bytes: bytes, modality: s
 
 @router.post("/predict/xray/")
 async def predict_xray(file: UploadFile = File(...)):
+    if not ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML inference unavailable on this deployment.")
     if file.content_type not in ["image/jpeg", "image/png", "image/bmp"]:
         raise HTTPException(status_code=400, detail="Unsupported file type.")
 
@@ -382,6 +399,8 @@ async def generate_report(
     modality: str = Path(..., description="One of: xray, ct, ultrasound, mri"),
     file: UploadFile = File(...)
 ):
+    if not ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML inference unavailable on this deployment.")
     modality = modality.lower()
     if modality not in ["xray", "ct", "ultrasound", "mri"]:
         raise HTTPException(status_code=400, detail="Invalid modality.")
@@ -443,6 +462,8 @@ async def get_latest_report(modality: str = Path(...)):
 # CT 2D and 3D routes
 @router.post("/predict/ct/2d/")
 async def generate_report_ct2d(file: UploadFile = File(...)):
+    if not ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML inference unavailable on this deployment.")
     modality = "ct"
     mode = "2d"
 
@@ -507,6 +528,8 @@ async def generate_report_ct2d(file: UploadFile = File(...)):
 ## 3d route 
 @router.post("/predict/ct/3d/")
 async def generate_report_ct3d(file: UploadFile = File(...)):
+    if not ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML inference unavailable on this deployment.")
     image_mime_types = ["image/jpeg", "image/png", "image/bmp"]
     if file.content_type not in image_mime_types and not has_volume_extension(file.filename or ""):
         raise HTTPException(
@@ -625,6 +648,8 @@ async def get_latest_report_ct3d():
 
 @router.post("/predict/mri/3d/")
 async def generate_report_mri3d(file: UploadFile = File(...)):  
+    if not ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML inference unavailable on this deployment.")
     image_mime_types = ["image/jpeg", "image/png", "image/bmp"]
     if file.content_type not in image_mime_types and not has_volume_extension(file.filename or ""):
         raise HTTPException(
@@ -736,6 +761,8 @@ async def get_latest_report_mri3d():
 
 @router.post("/predict/ultrasound/")
 async def generate_report_ultrasound(file: UploadFile = File(...)):
+    if not ML_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ML inference unavailable on this deployment.")
     modality = "ultrasound"
 
     # 1) Validate content type before saving
