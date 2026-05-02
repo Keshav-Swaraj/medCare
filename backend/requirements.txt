@@ -20,8 +20,8 @@ numpy
 opencv-python-headless
 pydantic
 pydicom
-torch==2.5.1+cpu
-torchvision==0.20.1+cpu
+torch
+torchvision
 tqdm
 PyPDF2
 timm

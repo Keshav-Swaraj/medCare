@@ -5,7 +5,7 @@ services:
     rootDir: backend
     buildCommand: |
       pip install --upgrade pip
-      pip install --find-links https://download.pytorch.org/whl/torch_stable.html -r requirements.txt
+      pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GEMINI_API_KEY
